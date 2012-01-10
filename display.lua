@@ -66,16 +66,16 @@ local function display(ui)
    if ui.mouse and _mousetic_==1 then
       local color = ui.colors[ui.currentId]
       local legend = 'learning [' .. ui.currentClass .. ']'
-      local x = (ui.mouse.x - options.box/2)
-      local y = (ui.mouse.y - options.box/2)
+      local x = ui.mouse.x
+      local y = ui.mouse.y
       local w = options.box
       local h = options.box
       painter:setcolor(color)
       painter:setlinewidth(3)
-      painter:rectangle(x * window_zoom, y * window_zoom, w * window_zoom, h * window_zoom)
+      painter:arc(x * window_zoom, y * window_zoom, h/2 * window_zoom, 0, 360)
       painter:stroke()
       painter:setfont(qt.QFont{serif=false,italic=false,size=14})
-      painter:moveto(x * window_zoom, (y-2) * window_zoom)
+      painter:moveto((x-options.box/2) * window_zoom, (y-options.box/2-2) * window_zoom)
       painter:show(legend)
    end
 

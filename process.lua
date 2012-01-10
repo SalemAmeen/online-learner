@@ -19,8 +19,7 @@ local boxs = options.box
 
 -- encoder
 print('loading encoder:')
-encoder = nn.Sequential()
-encoder:read(torch.DiskFile(options.encoder))
+encoder = torch.load(options.encoder)
 encoder:float()
 xprint(encoder.modules)
 print('')
@@ -87,6 +86,7 @@ local function process (ui)
    ui.rawFrameP = ui.rawFrameP or torch.Tensor()
    if ui.rawFrame then ui.rawFrameP:resizeAs(ui.rawFrame):copy(ui.rawFrame) end
    ui.rawFrame = source:forward()
+   ui.rawFrame = ui.rawFrame:float()
    ui.rawFrame:add(-ui.rawFrame:min()):div(math.max(ui.rawFrame:max(),1e-6))
    ui.yuvFrame = rgb2yuv:forward(ui.rawFrame)
    ui.yFrame = ui.yuvFrame:narrow(1,1,1)
