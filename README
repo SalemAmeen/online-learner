@@ -1,0 +1,14 @@
+In addition to the usual (torch, nnx, etc.) this demo requires the 
+following modules to be installed via luarocks:
+imgraph
+opencv
+inline
+
+You will need to have OpenCV installed for the opencv module. You will need
+the Boost libraries installed for the imgraph module.
+
+To install Boost on Mac OSX with Homebrew
+$ brew install boost
+
+To install Boost on Ubuntu
+$ sudo apt-get install libboost-dev
