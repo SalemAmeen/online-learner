@@ -4,8 +4,15 @@ imgraph
 opencv
 inline
 
-You will need to have OpenCV installed for the opencv module. You will need
-the Boost libraries installed for the imgraph module.
+You will need to have OpenCV installed for the opencv module. 
+
+To install OpenCV on MacOSX with Homebrew
+$ brew install opencv
+
+To install OpenCV on Ubuntu (https://help.ubuntu.com/community/OpenCV)
+$ sudo apt-get install libcv2.1 libcvaux2.1 libhighgui2.1 python-opencv opencv-doc libcv-dev libcvaux-dev libhighgui-dev
+
+You will need the Boost libraries installed for the imgraph module.
 
 To install Boost on Mac OSX with Homebrew
 $ brew install boost
