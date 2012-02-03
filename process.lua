@@ -1,10 +1,11 @@
-
 -- C coroutines
 local c = require 'coroutines'
 
 -- report results
 globs = {}
+-- stores the position and bounds of tracked objects
 globs.results = {}
+-- stores an image patch and its associated dense features (prototype)
 globs.memory = {}
 
 -- camera source, rescaler, color space
@@ -83,14 +84,22 @@ local function process (ui)
    -- (0) grab frame, get Y chanel and resize
    ------------------------------------------------------------
    profiler:start('get-camera-frame')
+   -- store previous frame
    ui.rawFrameP = ui.rawFrameP or torch.Tensor()
    if ui.rawFrame then ui.rawFrameP:resizeAs(ui.rawFrame):copy(ui.rawFrame) end
+
+   -- capture next frame
    ui.rawFrame = source:forward()
    ui.rawFrame = ui.rawFrame:float()
+
+   -- global linear normalization of input frame
    ui.rawFrame:add(-ui.rawFrame:min()):div(math.max(ui.rawFrame:max(),1e-6))
+
+   -- convert and rescale
    ui.yuvFrame = rgb2yuv:forward(ui.rawFrame)
-   ui.yFrame = ui.yuvFrame:narrow(1,1,1)
+   --ui.yFrame = ui.yuvFrame:narrow(1,1,1)
    ui.procFrame = rescaler:forward(ui.yuvFrame)
+
    profiler:lap('get-camera-frame')
 
    ------------------------------------------------------------
@@ -114,6 +123,7 @@ local function process (ui)
          nresult.trackPointsP = opencv.GoodFeaturesToTrack{image=box, count=100}
          nresult.trackPointsP:narrow(2,1,1):add(result.lx-1)
          nresult.trackPointsP:narrow(2,2,1):add(result.ty-1)
+         -- track using Pyramidal Lucas Kanade
          nresult.trackPoints = opencv.TrackPyrLK{pair={ui.rawFrameP,ui.rawFrame}, 
                                                  points_in=nresult.trackPointsP}
          local nbpoints = nresult.trackPointsP:size(1)
@@ -127,23 +137,27 @@ local function process (ui)
          local flow_x = flows[math.ceil(nbpoints/2)][1]
          local flow_y = flows[math.ceil(nbpoints/2)][2]
 
-         -- estimate spread of previous and new points
-         local std = torch.Tensor(nbpoints, 2):copy(nresult.trackPointsP)
-         local std_x = math.sqrt( std:narrow(2,1,1):add(-result.cx):pow(2):sum() / nbpoints )
-         local std_y = math.sqrt( std:narrow(2,2,1):add(-result.cy):pow(2):sum() / nbpoints )
-
+         -- update new result: new center position
          nresult.cx = result.cx + flow_x
          nresult.cy = result.cy + flow_y
 
+         -- estimate spread of previous and new points
+         -- previous
+         local std = torch.Tensor(nbpoints, 2):copy(nresult.trackPointsP)
+         local std_x = math.sqrt( std:narrow(2,1,1):add(-result.cx):pow(2):sum() / nbpoints )
+         local std_y = math.sqrt( std:narrow(2,2,1):add(-result.cy):pow(2):sum() / nbpoints )
+         -- new
          std:copy(nresult.trackPoints)
          local stdn_x = math.sqrt( std:narrow(2,1,1):add(-nresult.cx):pow(2):sum() / nbpoints )
          local stdn_y = math.sqrt( std:narrow(2,2,1):add(-nresult.cy):pow(2):sum() / nbpoints )
 
-         -- update new result
+         -- update new result:
+         -- new width and height
          local change_x = stdn_x / std_x
          local change_y = stdn_y / std_y
          nresult.w = result.w * change_x
          nresult.h = result.h * change_y
+         -- new top, left position
          nresult.lx = nresult.cx - nresult.w/2
          nresult.ty = nresult.cy - nresult.h/2
 
@@ -188,6 +202,7 @@ local function process (ui)
    -- get connected components
    local graph = imgraph.graph(globs.winners:type('torch.FloatTensor'), 4)
    local components = imgraph.connectcomponents(graph, 0.5)
+   -- find bounding boxes of blobs
    globs.blobs = c.getblobs(components, globs.winners, #ui.classes+1)
    --
    profiler:lap('estimate-distributions')
@@ -201,13 +216,17 @@ local function process (ui)
    local off_x = math.floor((ui.rawFrame:size(3) - globs.winners:size(2)*downs*encoder_dw)/2)
    local off_y = math.floor((ui.rawFrame:size(2) - globs.winners:size(1)*downs*encoder_dw)/2)
    for i,blob in pairs(globs.blobs) do
+      -- calculate blob center
       local x = math.ceil((blob[1]+blob[2])/2)
       local y = math.ceil((blob[3]+blob[4])/2)
       local id = blob[5]
       if id <= #ui.classes then
          -- new potential object at this location:
+         -- left x
          local lx = (x-1) * downs * encoder_dw + 1 + off_x - boxs/2
+         -- top y
          local ty = (y-1) * downs * encoder_dw + 1 + off_y - boxs/2
+         -- make sure box is in frame
          lx = math.min(math.max(1,lx),ui.rawFrame:size(3)-boxs+1)
          ty = math.min(math.max(1,ty),ui.rawFrame:size(2)-boxs+1)
          -- make sure it doesnt already exist from the tracker:
