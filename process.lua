@@ -117,12 +117,23 @@ local function process (ui)
          local nresult = {class=result.class, id=result.id}
 
          -- get box around result
-         local box = ui.rawFrameP:narrow(3,result.lx,result.w):narrow(2,result.ty,result.h)
+         -- local box = ui.rawFrameP:narrow(3,result.lx,result.w):narrow(2,result.ty,result.h)
 
          -- track points
-         nresult.trackPointsP = opencv.GoodFeaturesToTrack{image=box, count=100}
-         nresult.trackPointsP:narrow(2,1,1):add(result.lx-1)
-         nresult.trackPointsP:narrow(2,2,1):add(result.ty-1)
+         --nresult.trackPointsP = opencv.GoodFeaturesToTrack{image=box, count=100}
+         --nresult.trackPointsP:narrow(2,1,1):add(result.lx-1)
+         --nresult.trackPointsP:narrow(2,2,1):add(result.ty-1)
+         -- put tracking points on grid
+         nresult.trackPointsP = torch.Tensor(100,2)
+         local xpoints = lab.floor(lab.linspace(result.lx-1,result.lx-1+result.w, 10))
+         local ypoints = lab.floor(lab.linspace(result.ty-1,result.ty-1+result.h, 10))
+         for i = 1,10 do
+            local xy = nresult.trackPointsP:narrow(1,1+10*(i-1),10)
+            local x = xy:narrow(2,1,1)
+            local y = xy:narrow(2,2,1)
+            x:fill(xpoints[i])
+            y:copy(ypoints) 
+         end
          -- track using Pyramidal Lucas Kanade
          nresult.trackPoints = opencv.TrackPyrLK{pair={ui.rawFrameP,ui.rawFrame}, 
                                                  points_in=nresult.trackPointsP}
