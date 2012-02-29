@@ -132,8 +132,8 @@ local function process (ui)
          local flows = torch.Tensor(nbpoints, 2)
          flows:narrow(2,1,1):copy(nresult.trackPoints:narrow(2,1,1)):add(-nresult.trackPointsP:narrow(2,1,1))
          flows:narrow(2,2,1):copy(nresult.trackPoints:narrow(2,2,1)):add(-nresult.trackPointsP:narrow(2,2,1))
-         flows:narrow(2,1,1):copy( lab.sort(flows:narrow(2,1,1)) )
-         flows:narrow(2,2,1):copy( lab.sort(flows:narrow(2,2,1)) )
+         flows:narrow(2,1,1):copy( torch.sort(flows:narrow(2,1,1)) )
+         flows:narrow(2,2,1):copy( torch.sort(flows:narrow(2,2,1)) )
          local flow_x = flows[math.ceil(nbpoints/2)][1]
          local flow_y = flows[math.ceil(nbpoints/2)][2]
 
@@ -197,7 +197,7 @@ local function process (ui)
       end
    end
    -- get max (winning category)
-   _, globs.winners = lab.max(globs.distributions,1)
+   _, globs.winners = torch.max(globs.distributions,1)
    globs.winners = globs.winners[1]
    -- get connected components
    local graph = imgraph.graph(globs.winners:type('torch.FloatTensor'), 4)
