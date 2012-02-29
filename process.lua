@@ -117,34 +117,63 @@ local function process (ui)
          local nresult = {class=result.class, id=result.id}
 
          -- get box around result
-         -- local box = ui.rawFrameP:narrow(3,result.lx,result.w):narrow(2,result.ty,result.h)
+         local box = ui.rawFrameP:narrow(3,result.lx,result.w):narrow(2,result.ty,result.h)
 
          -- track points
-         --nresult.trackPointsP = opencv.GoodFeaturesToTrack{image=box, count=100}
-         --nresult.trackPointsP:narrow(2,1,1):add(result.lx-1)
-         --nresult.trackPointsP:narrow(2,2,1):add(result.ty-1)
+         --[[
+         nresult.trackPointsP = opencv.GoodFeaturesToTrack{image=box, count=100}
+         nresult.trackPointsP:narrow(2,1,1):add(result.lx-1)
+         nresult.trackPointsP:narrow(2,2,1):add(result.ty-1)
+         --]]
+         --[[
+         local allTrackPointsP = opencv.GoodFeaturesToTrack{image=box, count=100}
+         print(allTrackPointsP:size(1))
+         allTrackPointsP:narrow(2,1,1):add(result.lx-1)
+         allTrackPointsP:narrow(2,2,1):add(result.ty-1)
+         --]]
          -- put tracking points on grid
-         nresult.trackPointsP = torch.Tensor(100,2)
-         local xpoints = lab.floor(lab.linspace(result.lx-1,result.lx-1+result.w, 10))
-         local ypoints = lab.floor(lab.linspace(result.ty-1,result.ty-1+result.h, 10))
-         for i = 1,10 do
-            local xy = nresult.trackPointsP:narrow(1,1+10*(i-1),10)
-            local x = xy:narrow(2,1,1)
-            local y = xy:narrow(2,2,1)
-            x:fill(xpoints[i])
-            y:copy(ypoints) 
+         local xpoints = torch.floor(torch.linspace(result.lx-1,result.lx-1+result.w, math.floor(result.w/8)))
+         local xn = xpoints:size(1)
+         local ypoints = torch.floor(torch.linspace(result.ty-1,result.ty-1+result.h, math.floor(result.h/8)))
+         local yn = ypoints:size(1)
+         local allnbpoints = xn * yn
+         local nbpoints = math.floor(allnbpoints/2)
+         local allTrackPointsP = torch.Tensor(allnbpoints,2)
+         for i = 1,xn do
+             local xy = allTrackPointsP:narrow(1,1+yn*(i-1),yn)
+             local x = xy:narrow(2,1,1)
+             local y = xy:narrow(2,2,1)
+             x:fill(xpoints[i])
+             y:copy(ypoints) 
          end
+
          -- track using Pyramidal Lucas Kanade
-         nresult.trackPoints = opencv.TrackPyrLK{pair={ui.rawFrameP,ui.rawFrame}, 
-                                                 points_in=nresult.trackPointsP}
-         local nbpoints = nresult.trackPointsP:size(1)
+         local allTrackPointsF = opencv.TrackPyrLK{pair={ui.rawFrameP,ui.rawFrame}, 
+                                                points_in=allTrackPointsP}
+
+         local allTrackPointsB = opencv.TrackPyrLK{pair={ui.rawFrame,ui.rawFrameP}, 
+                                                points_in=allTrackPointsF}
+        
+         local sqdf=allTrackPointsB:mul(-1):add(allTrackPointsP):pow(2)
+         local sumsq = torch.sum(sqdf,2):select(2,1)
+         local _,idx=torch.sort(sumsq,1)
+
+         nresult.trackPointsP = torch.Tensor(nbpoints,2)
+         nresult.trackPoints = torch.Tensor(nbpoints,2)
+         for i = 1,nbpoints do
+             nresult.trackPointsP[i]:copy(allTrackPointsP[idx[i]])
+             nresult.trackPoints[i]:copy(allTrackPointsF[idx[i]])
+         end
+
+         --print(nresult.trackPointsP)
+         --print(nresult.trackPoints)
 
          -- estimate median flow
          local flows = torch.Tensor(nbpoints, 2)
          flows:narrow(2,1,1):copy(nresult.trackPoints:narrow(2,1,1)):add(-nresult.trackPointsP:narrow(2,1,1))
          flows:narrow(2,2,1):copy(nresult.trackPoints:narrow(2,2,1)):add(-nresult.trackPointsP:narrow(2,2,1))
-         flows:narrow(2,1,1):copy( lab.sort(flows:narrow(2,1,1)) )
-         flows:narrow(2,2,1):copy( lab.sort(flows:narrow(2,2,1)) )
+         flows:narrow(2,1,1):copy( torch.sort(flows:narrow(2,1,1)) )
+         flows:narrow(2,2,1):copy( torch.sort(flows:narrow(2,2,1)) )
          local flow_x = flows[math.ceil(nbpoints/2)][1]
          local flow_y = flows[math.ceil(nbpoints/2)][2]
 
@@ -152,6 +181,7 @@ local function process (ui)
          nresult.cx = result.cx + flow_x
          nresult.cy = result.cy + flow_y
 
+         --[[
          -- estimate spread of previous and new points
          -- previous
          local std = torch.Tensor(nbpoints, 2):copy(nresult.trackPointsP)
@@ -166,6 +196,22 @@ local function process (ui)
          -- new width and height
          local change_x = stdn_x / std_x
          local change_y = stdn_y / std_y
+         --]]
+
+         -- ratio between current point distance and previous point distance for each pair of points
+         local dratio = torch.Tensor(nbpoints*(nbpoints-1)/2, 2) 
+         local offset = 0
+         for i = 1,nbpoints do
+             for j = i+1,nbpoints do
+                 dist=nresult.trackPoints[i]-nresult.trackPoints[j]
+                 distP=nresult.trackPointsP[i]-nresult.trackPointsP[j]
+                 dratio[offset+(j-i)]:copy(torch.cdiv(dist,distP)) 
+             end
+             offset = offset+(nbpoints-i)
+         end
+         local change_x = dratio[math.ceil(dratio:size(1)/2)][1]
+         local change_y = dratio[math.ceil(dratio:size(1)/2)][2]
+
          nresult.w = result.w * change_x
          nresult.h = result.h * change_y
          -- new top, left position
@@ -208,7 +254,7 @@ local function process (ui)
       end
    end
    -- get max (winning category)
-   _, globs.winners = lab.max(globs.distributions,1)
+   _, globs.winners = torch.max(globs.distributions,1)
    globs.winners = globs.winners[1]
    -- get connected components
    local graph = imgraph.graph(globs.winners:type('torch.FloatTensor'), 4)
