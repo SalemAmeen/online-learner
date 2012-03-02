@@ -132,9 +132,9 @@ local function process (ui)
          allTrackPointsP:narrow(2,2,1):add(result.ty-1)
          --]]
          -- put tracking points on grid
-         local xpoints = torch.floor(torch.linspace(result.lx-1,result.lx-1+result.w, math.floor(result.w/8)))
+         local xpoints = torch.floor(torch.linspace(result.lx-1,result.lx-1+result.w, math.floor(result.w/9)))
          local xn = xpoints:size(1)
-         local ypoints = torch.floor(torch.linspace(result.ty-1,result.ty-1+result.h, math.floor(result.h/8)))
+         local ypoints = torch.floor(torch.linspace(result.ty-1,result.ty-1+result.h, math.floor(result.h/9)))
          local yn = ypoints:size(1)
          local allnbpoints = xn * yn
          local nbpoints = math.floor(allnbpoints/2)
@@ -148,12 +148,12 @@ local function process (ui)
          end
 
          -- track using Pyramidal Lucas Kanade
-         local allTrackPointsF = opencv.TrackPyrLK{pair={ui.rawFrameP,ui.rawFrame}, 
+         local allTrackPointsF = opencv.TrackPyrLK{pair={ui.rawFrameP,ui.rawFrame},
                                                 points_in=allTrackPointsP}
 
-         local allTrackPointsB = opencv.TrackPyrLK{pair={ui.rawFrame,ui.rawFrameP}, 
+         local allTrackPointsB = opencv.TrackPyrLK{pair={ui.rawFrame,ui.rawFrameP},
                                                 points_in=allTrackPointsF}
-        
+
          local sqdf=allTrackPointsB:mul(-1):add(allTrackPointsP):pow(2)
          local sumsq = torch.sum(sqdf,2):select(2,1)
          local _,idx=torch.sort(sumsq,1)
@@ -209,6 +209,7 @@ local function process (ui)
              end
              offset = offset+(nbpoints-i)
          end
+         dratio, _ = torch.sort(dratio,1)
          local change_x = dratio[math.ceil(dratio:size(1)/2)][1]
          local change_y = dratio[math.ceil(dratio:size(1)/2)][2]
 
@@ -224,6 +225,13 @@ local function process (ui)
              and change_x < 1.3 and change_x > 0.7 and change_y < 1.3 and change_y > 0.7 
              and flow_x < 100 and flow_y < 100 then
             table.insert(globs.results, nresult)
+         else
+           print('dropping tracked result:')
+           print('change_x = ' .. change_x)
+           print('change_y = ' .. change_y)
+           print('flow_x = ' .. flow_x)
+           print('flow_y = ' .. flow_y)
+           print('')
          end
       end
       profiler:lap('track-interest-points')
