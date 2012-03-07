@@ -14,7 +14,10 @@ local boxh = options.boxh
 local boxw = options.boxw
 
 -- camera source, rescaler, color space
-source = image.Camera{}
+if options.source == 'camera' then
+   require 'camera'
+   source = image.Camera{}
+end
 rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
 rescaler = nn.SpatialReSampling{owidth=options.width/options.downsampling+3,
                                 oheight=options.height/options.downsampling+3}

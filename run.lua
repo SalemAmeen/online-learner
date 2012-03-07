@@ -31,7 +31,6 @@ require 'xlua'
 require 'nnx'
 require 'imgraph'
 require 'opencv'
-require 'camera'
 require 'openmp'
 
 -- parse args
