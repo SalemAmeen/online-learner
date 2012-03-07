@@ -68,8 +68,8 @@ local function display(ui)
       local legend = 'learning [' .. ui.currentClass .. ']'
       local x = ui.mouse.x
       local y = ui.mouse.y
-      local w = options.box
-      local h = options.box
+      local w = options.boxw
+      local h = options.boxh
       painter:setcolor(color)
       painter:setlinewidth(3)
       painter:arc(x * window_zoom, y * window_zoom, h/2 * window_zoom, 0, 360)

@@ -8,15 +8,16 @@ globs.results = {}
 -- stores an image patch and its associated dense features (prototype)
 globs.memory = {}
 
+-- some options
+local downs = options.downsampling
+local boxh = options.boxh
+local boxw = options.boxw
+
 -- camera source, rescaler, color space
 source = image.Camera{}
 rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
 rescaler = nn.SpatialReSampling{owidth=options.width/options.downsampling+3,
                                 oheight=options.height/options.downsampling+3}
-
--- some options
-local downs = options.downsampling
-local boxs = options.box
 
 -- encoder
 print('loading encoder:')
@@ -24,8 +25,8 @@ encoder = torch.load(options.encoder)
 encoder:float()
 xprint(encoder.modules)
 print('')
-print('calibrating encoder so as to produce a single vector for a training patch of width ' .. boxs/downs .. ' ...')
-local t = torch.Tensor(3,boxs/downs,boxs/downs)
+print('calibrating encoder so as to produce a single vector for a training patch of width ' .. boxw/downs .. ' and height ' .. boxh/downs .. '...')
+local t = torch.Tensor(3,boxh/downs,boxw/downs)
 local res = encoder:forward(t)
 local pw = res:size(3)
 encoderm = encoder:clone()
@@ -230,22 +231,22 @@ local function process (ui)
       if id <= #ui.classes then
          -- new potential object at this location:
          -- left x
-         local lx = (x-1) * downs * encoder_dw + 1 + off_x - boxs/2
+         local lx = (x-1) * downs * encoder_dw + 1 + off_x - boxw/2
          -- top y
-         local ty = (y-1) * downs * encoder_dw + 1 + off_y - boxs/2
+         local ty = (y-1) * downs * encoder_dw + 1 + off_y - boxh/2
          -- make sure box is in frame
-         lx = math.min(math.max(1,lx),ui.rawFrame:size(3)-boxs+1)
-         ty = math.min(math.max(1,ty),ui.rawFrame:size(2)-boxs+1)
+         lx = math.min(math.max(1,lx),ui.rawFrame:size(3)-boxw+1)
+         ty = math.min(math.max(1,ty),ui.rawFrame:size(2)-boxh+1)
          -- make sure it doesnt already exist from the tracker:
          local exists = false
          for _,res in ipairs(globs.results) do
-            if (lx+boxs) > res.lx and lx < (res.lx+res.w) and (ty+boxs) > res.ty and ty < (res.ty+res.h) then
+            if (lx+boxw) > res.lx and lx < (res.lx+res.w) and (ty+boxh) > res.ty and ty < (res.ty+res.h) then
                -- clears this object from recognition
                exists = true
             end
          end
          if not exists then
-            local nresult = {lx=lx, ty=ty, cx=lx+boxs/2, cy=ty+boxs/2, w=boxs, h=boxs,
+            local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, h=boxh,
                              class=ui.classes[id].text:tostring(), id=id}
             table.insert(globs.results, nresult)
          end
@@ -268,15 +269,15 @@ local function process (ui)
             ui.logit('auto-learning [' .. res.class .. ']', ui.colors[res.id])
 
             -- compute x,y coordinates
-            local lx = math.min(math.max(res.cx-boxs/2,0),ui.yuvFrame:size(3)-boxs)
-            local ty = math.min(math.max(res.cy-boxs/2,0),ui.yuvFrame:size(2)-boxs)
+            local lx = math.min(math.max(res.cx-boxw/2,0),ui.yuvFrame:size(3)-boxw)
+            local ty = math.min(math.max(res.cy-boxh/2,0),ui.yuvFrame:size(2)-boxh)
 
             -- remap to smaller proc map
             lx = lx / downs + 1
             ty = ty / downs + 1
 
             -- extract patch at that location
-            local patch = ui.procFrame:narrow(3,lx,boxs/downs):narrow(2,ty,boxs/downs):clone()
+            local patch = ui.procFrame:narrow(3,lx,boxw/downs):narrow(2,ty,boxh/downs):clone()
 
             -- compute code for patch
             local code = encoder_patch:forward(patch):clone()
@@ -295,12 +296,12 @@ local function process (ui)
    if ui.learn then
       profiler:start('learn-new-view')
       -- compute x,y coordinates
-      local lx = math.min(math.max(ui.learn.x-boxs/2,0),ui.yuvFrame:size(3)-boxs)
-      local ty = math.min(math.max(ui.learn.y-boxs/2,0),ui.yuvFrame:size(2)-boxs)
+      local lx = math.min(math.max(ui.learn.x-boxw/2,0),ui.yuvFrame:size(3)-boxw)
+      local ty = math.min(math.max(ui.learn.y-boxh/2,0),ui.yuvFrame:size(2)-boxh)
       ui.logit('adding [' .. ui.learn.class .. '] at ' .. lx .. ',' .. ty, ui.colors[ui.learn.id])
 
       -- and create a result !!
-      local nresult = {lx=lx, ty=ty, cx=lx+boxs/2, cy=ty+boxs/2, w=boxs, h=boxs,
+      local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, h=boxh,
                        class=ui.classes[ui.learn.id].text:tostring(), id=ui.learn.id}
       table.insert(globs.results, nresult)
 
@@ -309,7 +310,7 @@ local function process (ui)
       ty = ty / downs + 1
 
       -- extract patch at that location
-      local patch = ui.procFrame:narrow(3,lx,boxs/downs):narrow(2,ty,boxs/downs):clone()
+      local patch = ui.procFrame:narrow(3,lx,boxw/downs):narrow(2,ty,boxh/downs):clone()
 
       -- compute code for patch
       local code = encoder_patch:forward(patch):clone()

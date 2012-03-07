@@ -89,6 +89,9 @@ op:option{'-f', '--file', action='store', dest='file',
 
 options,args = op:parse()
 
+options.boxh = options.box
+options.boxw = options.box
+
 -- save ?
 if options.save then
    os.execute('mkdir -p ' .. options.save)
