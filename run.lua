@@ -36,19 +36,19 @@ require 'openmp'
 -- parse args
 op = xlua.OptionParser('%prog [options]')
 op:option{'-s', '--source', action='store', dest='source',
-          help='image source, can be one of: camera | lena | video',
+          help='image source, can be one of: camera | video | dataset',
           default='camera'}
 
 op:option{'-c', '--camera', action='store', dest='camidx',
           help='if source=camera, you can specify the camera index: /dev/videoIDX',
           default=0}
 
+op:option{'-s', '--save', action='store', dest='save',
+          help='path to save video stream'}
+
 op:option{'-v', '--video', action='store', dest='video',
           help='path to video',
           default=''}
-
-op:option{'-s', '--save', action='store', dest='save',
-          help='path to save video stream'}
 
 op:option{'-r', '--vrate', action='store', dest='fps',
           help='video rate (fps), for video only',
@@ -57,6 +57,10 @@ op:option{'-r', '--vrate', action='store', dest='fps',
 op:option{'-l', '--vlength', action='store', dest='length',
           help='video length (seconds), for video only',
           default=10}
+
+op:option{'-p', '--dspath', action='store', dest='dspath',
+          help='path to dataset',
+          default=''}
 
 op:option{'-e', '--encoder', action='store', dest='encoder',
           help='path to encoder module (typically a convnet, sparsifier, ...)',

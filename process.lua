@@ -17,7 +17,28 @@ local boxw = options.boxw
 if options.source == 'camera' then
    require 'camera'
    source = image.Camera{}
+elseif options.source == 'video' then
+   require 'ffmpeg'
+   source = ffmpeg.Video{path=options.video, width=options.width,
+                         height=options.height, fps=options.fps,
+                         length=options.length}
+elseif options.source == 'dataset' then
+   local f = assert(io.open(sys.concat(options.dspath,'init.txt')))
+   local init = f:read('*all')
+   _, _, lx, ty, rx, by = string.find(init, '(.*),(.*),(.*),(.*)')
+   local lx = tonumber(lx)
+   local ty = tonumber(ty)
+   local rx = tonumber(rx)
+   local by = tonumber(by)
+   boxw = rx - lx
+   boxh = by - ty
+
+   require 'ffmpeg'
+   source = ffmpeg.Video{path=options.dspath, encoding='jpg', loaddump=true} 
+   options.width = source.width
+   options.height = source.height
 end
+
 rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
 rescaler = nn.SpatialReSampling{owidth=options.width/options.downsampling+3,
                                 oheight=options.height/options.downsampling+3}
@@ -87,7 +108,7 @@ local function process (ui)
    ------------------------------------------------------------
    -- (0) grab frame, get Y chanel and resize
    ------------------------------------------------------------
-   profiler:start('get-camera-frame')
+   profiler:start('get-frame')
    -- store previous frame
    ui.rawFrameP = ui.rawFrameP or torch.Tensor()
    if ui.rawFrame then ui.rawFrameP:resizeAs(ui.rawFrame):copy(ui.rawFrame) end
@@ -104,7 +125,7 @@ local function process (ui)
    --ui.yFrame = ui.yuvFrame:narrow(1,1,1)
    ui.procFrame = rescaler:forward(ui.yuvFrame)
 
-   profiler:lap('get-camera-frame')
+   profiler:lap('get-frame')
 
    ------------------------------------------------------------
    -- (1) track objects
