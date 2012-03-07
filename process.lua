@@ -172,12 +172,12 @@ local function process (ui)
              and flow_x < 100 and flow_y < 100 then
             table.insert(globs.results, nresult)
          else
-           print('dropping tracked result:')
-           print('change_x = ' .. change_x)
-           print('change_y = ' .. change_y)
-           print('flow_x = ' .. flow_x)
-           print('flow_y = ' .. flow_y)
-           print('')
+            print('dropping tracked result:')
+            print('change_x = ' .. change_x)
+            print('change_y = ' .. change_y)
+            print('flow_x = ' .. flow_x)
+            print('flow_y = ' .. flow_y)
+            print('')
          end
       end
       profiler:lap('track-interest-points')
