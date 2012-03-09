@@ -110,6 +110,7 @@ profiler = xlua.Profiler()
 sys.execute('mkdir -p scratch')
 
 -- load all submodules
-process = require 'process'
 display = require 'display'
 ui = require 'ui'
+process = require 'process'
+ui.start()
