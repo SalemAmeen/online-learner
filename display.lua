@@ -44,6 +44,22 @@ local function display(ui)
                  win=painter,
                  zoom=window_zoom}
 
+   if options.source == 'dataset' then
+      -- draw a box around ground truth
+      local w = gt.rx - gt.lx
+      local h = gt.by - gt.ty
+      local x = gt.lx
+      local y = gt.ty
+      painter:setcolor('green')
+      painter:setlinewidth(3)
+      painter:rectangle(x * window_zoom, y * window_zoom, w * window_zoom, h * window_zoom)
+      painter:stroke()
+      painter:setfont(qt.QFont{serif=false,italic=false,size=14})
+      painter:moveto(x * window_zoom, (y-2) * window_zoom)
+      painter:show('Ground truth')
+      gt:next()
+   end
+
    -- draw a box around detections
    for _,res in ipairs(globs.results) do
       local color = ui.colors[res.id]

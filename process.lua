@@ -23,15 +23,20 @@ elseif options.source == 'video' then
                          height=options.height, fps=options.fps,
                          length=options.length}
 elseif options.source == 'dataset' then
-   local f = assert(io.open(sys.concat(options.dspath,'init.txt')))
-   local init = f:read('*all')
-   _, _, lx, ty, rx, by = string.find(init, '(.*),(.*),(.*),(.*)')
-   local lx = tonumber(lx)
-   local ty = tonumber(ty)
-   local rx = tonumber(rx)
-   local by = tonumber(by)
-   boxw = rx - lx
-   boxh = by - ty
+   io.input(sys.concat(options.dspath,'init.txt'))
+   gt = {}
+   function gt:next()
+      line = io.read('*line')
+      local _, _, lx, ty, rx, by = string.find(line, '(.*),(.*),(.*),(.*)')
+      self.lx = tonumber(lx)
+      self.ty = tonumber(ty)
+      self.rx = tonumber(rx)
+      self.by = tonumber(by)
+   end
+   gt:next()
+   boxw = gt.rx - gt.lx
+   boxh = gt.by - gt.ty
+   io.input(sys.concat(options.dspath,'gt.txt'))
 
    require 'ffmpeg'
    source = ffmpeg.Video{path=options.dspath, encoding='jpg', loaddump=true} 
