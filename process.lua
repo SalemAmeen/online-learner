@@ -39,7 +39,7 @@ elseif options.source == 'dataset' then
    io.input(sys.concat(options.dspath,'gt.txt'))
 
    require 'ffmpeg'
-   source = ffmpeg.Video{path=options.dspath, encoding='jpg', loaddump=true} 
+   source = ffmpeg.Video{path=options.dspath, encoding='jpg', loaddump=true, load=false}
    options.width = source.width
    options.height = source.height
 end
