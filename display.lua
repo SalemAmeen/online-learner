@@ -75,20 +75,21 @@ local function display(ui)
       painter:arc(x * window_zoom, y * window_zoom, h/2 * window_zoom, 0, 360)
       painter:stroke()
       painter:setfont(qt.QFont{serif=false,italic=false,size=14})
-      painter:moveto((x-options.box/2) * window_zoom, (y-options.box/2-2) * window_zoom)
+      painter:moveto((x-options.boxw/2) * window_zoom, (y-options.boxh/2-2) * window_zoom)
       painter:show(legend)
    end
 
    -- display extra stuff
    if options.display >= 1 then
-      local size = options.box/options.downsampling
+      local sizew = options.boxw/options.downsampling
+      local sizeh = options.boxh/options.downsampling
 
       -- display class distributions
       for id = 1,#ui.classes+1 do
          image.display{image=globs.distributions[id],
                        legend=(id==1 and 'class distributions') or nil,
                        win=painter,
-                       x=ui.rawFrame:size(3) + (id-1)*size,
+                       x=ui.rawFrame:size(3) + (id-1)*sizew,
                        y=16,
                        zoom=window_zoom}
       end
@@ -109,8 +110,8 @@ local function display(ui)
                image.display{image=proto.patch,
                              legend=(k==1 and 'Obj-'..id) or nil,
                              win=painter,
-                             x=ui.rawFrame:size(3) + (id-1)*size,
-                             y=(k-1)*size + globs.distributions:size(2)*3+48,
+                             x=ui.rawFrame:size(3) + (id-1)*sizew,
+                             y=(k-1)*sizeh + globs.distributions:size(2)*3+48,
                              zoom=window_zoom}
             end
          end
