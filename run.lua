@@ -75,6 +75,10 @@ op:option{'-b', '--box', action='store', dest='box',
           help='box (training) size',
           default=128}
 
+op:option{'-T', '--tracker', action='store', dest='tracker',
+          help='tracking algorithm',
+          default='simple'}
+
 op:option{'-d', '--downsampling', action='store', dest='downsampling',
           help='downsampling for recognition/processing',
           default=2}
