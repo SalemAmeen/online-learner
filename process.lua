@@ -8,15 +8,56 @@ globs.results = {}
 -- stores an image patch and its associated dense features (prototype)
 globs.memory = {}
 
--- camera source, rescaler, color space
-source = image.Camera{}
-rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
-rescaler = nn.SpatialReSampling{owidth=options.width/options.downsampling+3,
-                                oheight=options.height/options.downsampling+3}
-
 -- some options
 local downs = options.downsampling
-local boxs = options.box
+local boxh = options.boxh
+local boxw = options.boxw
+
+-- camera source, rescaler, color space
+if options.source == 'camera' then
+   require 'camera'
+   source = image.Camera{}
+elseif options.source == 'video' then
+   require 'ffmpeg'
+   source = ffmpeg.Video{path=options.video, width=options.width,
+                         height=options.height, fps=options.fps,
+                         length=options.length}
+elseif options.source == 'dataset' then
+   io.input(sys.concat(options.dspath,'init.txt'))
+   gt = {}
+   function gt:next()
+      line = io.read('*line')
+      local _, _, lx, ty, rx, by = string.find(line, '(.*),(.*),(.*),(.*)')
+      self.lx = tonumber(lx)
+      self.ty = tonumber(ty)
+      self.rx = tonumber(rx)
+      self.by = tonumber(by)
+   end
+   gt:next()
+   boxw = gt.rx - gt.lx
+   boxh = gt.by - gt.ty
+   io.input(sys.concat(options.dspath,'gt.txt'))
+
+   require 'ffmpeg'
+   source = ffmpeg.Video{path=options.dspath, encoding=options.dsencoding,
+                         loaddump=true, load=false}
+   options.width = source.width
+   options.height = source.height
+end
+
+rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
+if options.source == 'dataset' then
+   --ignore downsampling, set so that width and height are at least 64px
+   downs = math.min(boxh, boxw)/64
+   rescaler = nn.SpatialReSampling{owidth=options.width/downs,
+                                   oheight=options.height/downs}
+   ui.learn = {x=(gt.lx+gt.rx)/2, y=(gt.ty+gt.by)/2,
+               id=ui.currentId, class=ui.currentClass}
+else
+   rescaler = nn.SpatialReSampling{owidth=options.width/downs+3,
+                                   oheight=options.height/downs+3}
+end
+
 
 -- encoder
 print('loading encoder:')
@@ -24,14 +65,15 @@ encoder = torch.load(options.encoder)
 encoder:float()
 xprint(encoder.modules)
 print('')
-print('calibrating encoder so as to produce a single vector for a training patch of width ' .. boxs/downs .. ' ...')
-local t = torch.Tensor(3,boxs/downs,boxs/downs)
+print('calibrating encoder so as to produce a single vector for a training patch of width ' .. boxw/downs .. ' and height ' .. boxh/downs .. '...')
+local t = torch.Tensor(3,boxh/downs,boxw/downs)
 local res = encoder:forward(t)
 local pw = res:size(3)
+local ph = res:size(2)
 encoderm = encoder:clone()
-maxpooler = nn.SpatialMaxPooling(pw,pw,1,1)
+maxpooler = nn.SpatialMaxPooling(pw,ph,1,1)
 encoderm:add(maxpooler)
-print(' ... appending a ' .. pw .. 'x' .. pw .. ' max-pooling module')
+print(' ... appending a ' .. pw .. 'x' .. ph .. ' max-pooling module')
 encoder_dw = 1
 for i,mod in ipairs(encoderm.modules) do
    if mod.dW then encoder_dw = encoder_dw * mod.dW end
@@ -219,7 +261,7 @@ local function process (ui)
    ------------------------------------------------------------
    -- (0) grab frame, get Y chanel and resize
    ------------------------------------------------------------
-   profiler:start('get-camera-frame')
+   profiler:start('get-frame')
    -- store previous frame
    ui.rawFrameP = ui.rawFrameP or torch.Tensor()
    if ui.rawFrame then ui.rawFrameP:resizeAs(ui.rawFrame):copy(ui.rawFrame) end
@@ -236,7 +278,7 @@ local function process (ui)
    --ui.yFrame = ui.yuvFrame:narrow(1,1,1)
    ui.procFrame = rescaler:forward(ui.yuvFrame)
 
-   profiler:lap('get-camera-frame')
+   profiler:lap('get-frame')
 
    ------------------------------------------------------------
    -- (1) track objects
@@ -322,22 +364,22 @@ local function process (ui)
       if id <= #ui.classes then
          -- new potential object at this location:
          -- left x
-         local lx = (x-1) * downs * encoder_dw + 1 + off_x - boxs/2
+         local lx = (x-1) * downs * encoder_dw + 1 + off_x - boxw/2
          -- top y
-         local ty = (y-1) * downs * encoder_dw + 1 + off_y - boxs/2
+         local ty = (y-1) * downs * encoder_dw + 1 + off_y - boxh/2
          -- make sure box is in frame
-         lx = math.min(math.max(1,lx),ui.rawFrame:size(3)-boxs+1)
-         ty = math.min(math.max(1,ty),ui.rawFrame:size(2)-boxs+1)
+         lx = math.min(math.max(1,lx),ui.rawFrame:size(3)-boxw+1)
+         ty = math.min(math.max(1,ty),ui.rawFrame:size(2)-boxh+1)
          -- make sure it doesnt already exist from the tracker:
          local exists = false
          for _,res in ipairs(globs.results) do
-            if (lx+boxs) > res.lx and lx < (res.lx+res.w) and (ty+boxs) > res.ty and ty < (res.ty+res.h) then
+            if (lx+boxw) > res.lx and lx < (res.lx+res.w) and (ty+boxh) > res.ty and ty < (res.ty+res.h) then
                -- clears this object from recognition
                exists = true
             end
          end
          if not exists then
-            local nresult = {lx=lx, ty=ty, cx=lx+boxs/2, cy=ty+boxs/2, w=boxs, h=boxs,
+            local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, h=boxh,
                              class=ui.classes[id].text:tostring(), id=id}
             table.insert(globs.results, nresult)
          end
@@ -360,15 +402,15 @@ local function process (ui)
             ui.logit('auto-learning [' .. res.class .. ']', ui.colors[res.id])
 
             -- compute x,y coordinates
-            local lx = math.min(math.max(res.cx-boxs/2,0),ui.yuvFrame:size(3)-boxs)
-            local ty = math.min(math.max(res.cy-boxs/2,0),ui.yuvFrame:size(2)-boxs)
+            local lx = math.min(math.max(res.cx-boxw/2,0),ui.yuvFrame:size(3)-boxw)
+            local ty = math.min(math.max(res.cy-boxh/2,0),ui.yuvFrame:size(2)-boxh)
 
             -- remap to smaller proc map
             lx = lx / downs + 1
             ty = ty / downs + 1
 
             -- extract patch at that location
-            local patch = ui.procFrame:narrow(3,lx,boxs/downs):narrow(2,ty,boxs/downs):clone()
+            local patch = ui.procFrame:narrow(3,lx,boxw/downs):narrow(2,ty,boxh/downs):clone()
 
             -- compute code for patch
             local code = encoder_patch:forward(patch):clone()
@@ -387,12 +429,12 @@ local function process (ui)
    if ui.learn then
       profiler:start('learn-new-view')
       -- compute x,y coordinates
-      local lx = math.min(math.max(ui.learn.x-boxs/2,0),ui.yuvFrame:size(3)-boxs)
-      local ty = math.min(math.max(ui.learn.y-boxs/2,0),ui.yuvFrame:size(2)-boxs)
+      local lx = math.min(math.max(ui.learn.x-boxw/2,0),ui.yuvFrame:size(3)-boxw)
+      local ty = math.min(math.max(ui.learn.y-boxh/2,0),ui.yuvFrame:size(2)-boxh)
       ui.logit('adding [' .. ui.learn.class .. '] at ' .. lx .. ',' .. ty, ui.colors[ui.learn.id])
 
       -- and create a result !!
-      local nresult = {lx=lx, ty=ty, cx=lx+boxs/2, cy=ty+boxs/2, w=boxs, h=boxs,
+      local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, h=boxh,
                        class=ui.classes[ui.learn.id].text:tostring(), id=ui.learn.id}
       table.insert(globs.results, nresult)
 
@@ -401,7 +443,7 @@ local function process (ui)
       ty = ty / downs + 1
 
       -- extract patch at that location
-      local patch = ui.procFrame:narrow(3,lx,boxs/downs):narrow(2,ty,boxs/downs):clone()
+      local patch = ui.procFrame:narrow(3,lx,boxw/downs):narrow(2,ty,boxh/downs):clone()
 
       -- compute code for patch
       local code = encoder_patch:forward(patch):clone()

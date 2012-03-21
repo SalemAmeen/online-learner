@@ -44,6 +44,22 @@ local function display(ui)
                  win=painter,
                  zoom=window_zoom}
 
+   if options.source == 'dataset' then
+      -- draw a box around ground truth
+      local w = gt.rx - gt.lx
+      local h = gt.by - gt.ty
+      local x = gt.lx
+      local y = gt.ty
+      painter:setcolor('green')
+      painter:setlinewidth(3)
+      painter:rectangle(x * window_zoom, y * window_zoom, w * window_zoom, h * window_zoom)
+      painter:stroke()
+      painter:setfont(qt.QFont{serif=false,italic=false,size=14})
+      painter:moveto(x * window_zoom, (y-2) * window_zoom)
+      painter:show('Ground truth')
+      gt:next()
+   end
+
    -- draw a box around detections
    for _,res in ipairs(globs.results) do
       local color = ui.colors[res.id]
@@ -68,27 +84,28 @@ local function display(ui)
       local legend = 'learning [' .. ui.currentClass .. ']'
       local x = ui.mouse.x
       local y = ui.mouse.y
-      local w = options.box
-      local h = options.box
+      local w = options.boxw
+      local h = options.boxh
       painter:setcolor(color)
       painter:setlinewidth(3)
       painter:arc(x * window_zoom, y * window_zoom, h/2 * window_zoom, 0, 360)
       painter:stroke()
       painter:setfont(qt.QFont{serif=false,italic=false,size=14})
-      painter:moveto((x-options.box/2) * window_zoom, (y-options.box/2-2) * window_zoom)
+      painter:moveto((x-options.boxw/2) * window_zoom, (y-options.boxh/2-2) * window_zoom)
       painter:show(legend)
    end
 
    -- display extra stuff
    if options.display >= 1 then
-      local size = options.box/options.downsampling
+      local sizew = options.boxw/options.downsampling
+      local sizeh = options.boxh/options.downsampling
 
       -- display class distributions
       for id = 1,#ui.classes+1 do
          image.display{image=globs.distributions[id],
                        legend=(id==1 and 'class distributions') or nil,
                        win=painter,
-                       x=ui.rawFrame:size(3) + (id-1)*size,
+                       x=ui.rawFrame:size(3) + (id-1)*sizew,
                        y=16,
                        zoom=window_zoom}
       end
@@ -109,8 +126,8 @@ local function display(ui)
                image.display{image=proto.patch,
                              legend=(k==1 and 'Obj-'..id) or nil,
                              win=painter,
-                             x=ui.rawFrame:size(3) + (id-1)*size,
-                             y=(k-1)*size + globs.distributions:size(2)*3+48,
+                             x=ui.rawFrame:size(3) + (id-1)*sizew,
+                             y=(k-1)*sizeh + globs.distributions:size(2)*3+48,
                              zoom=window_zoom}
             end
          end

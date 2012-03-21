@@ -6,7 +6,10 @@ local ui = {}
 local timer = qt.QTimer()
 timer.interval = 10
 timer.singleShot = true
-timer:start()
+--timer:start()
+ui.start = function()
+              timer:start()
+           end
 qt.connect(timer,
            'timeout()',
            function()
