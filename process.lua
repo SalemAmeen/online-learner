@@ -45,8 +45,18 @@ elseif options.source == 'dataset' then
 end
 
 rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
-rescaler = nn.SpatialReSampling{owidth=options.width/options.downsampling+3,
-                                oheight=options.height/options.downsampling+3}
+if options.source == 'dataset' then
+   --ignore downsampling, set so that width and height are at least 64px
+   downs = math.min(boxh, boxw)/64
+   rescaler = nn.SpatialReSampling{owidth=options.width/downs,
+                                   oheight=options.height/downs}
+   ui.learn = {x=(gt.lx+gt.rx)/2, y=(gt.ty+gt.by)/2,
+               id=ui.currentId, class=ui.currentClass}
+else
+   rescaler = nn.SpatialReSampling{owidth=options.width/downs+3,
+                                   oheight=options.height/downs+3}
+end
+
 
 -- encoder
 print('loading encoder:')
