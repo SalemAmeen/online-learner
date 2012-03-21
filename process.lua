@@ -68,10 +68,11 @@ print('calibrating encoder so as to produce a single vector for a training patch
 local t = torch.Tensor(3,boxh/downs,boxw/downs)
 local res = encoder:forward(t)
 local pw = res:size(3)
+local ph = res:size(2)
 encoderm = encoder:clone()
-maxpooler = nn.SpatialMaxPooling(pw,pw,1,1)
+maxpooler = nn.SpatialMaxPooling(pw,ph,1,1)
 encoderm:add(maxpooler)
-print(' ... appending a ' .. pw .. 'x' .. pw .. ' max-pooling module')
+print(' ... appending a ' .. pw .. 'x' .. ph .. ' max-pooling module')
 encoder_dw = 1
 for i,mod in ipairs(encoderm.modules) do
    if mod.dW then encoder_dw = encoder_dw * mod.dW end
