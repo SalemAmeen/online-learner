@@ -99,9 +99,12 @@ local function simpletracker(ui, result)
 
    -- track points
    nresult.trackPointsP = opencv.GoodFeaturesToTrack{image=box, count=100}
+   if nresult.trackPointsP:dim() < 2 then
+      return nil
+   end
+   local nbpoints = nresult.trackPointsP:size(1)
    nresult.trackPointsP:narrow(2,1,1):add(result.lx-1)
    nresult.trackPointsP:narrow(2,2,1):add(result.ty-1)
-   local nbpoints = nresult.trackPointsP:size(1)
 
    -- track using Pyramidal Lucas Kanade
    nresult.trackPoints = opencv.TrackPyrLK{pair={ui.rawFrameP,ui.rawFrame},
@@ -295,7 +298,9 @@ local function process (ui)
          local nresult = track(ui,result)
 
          -- if result still in the fov, and didnt change too much, then keep it !
-         if nresult.ty >= 1 and (nresult.ty+nresult.h-1) <= ui.yuvFrame:size(2)
+         if not nresult then
+            print('dropping tracked result: no tracking points returns\n')
+         elseif nresult.ty >= 1 and (nresult.ty+nresult.h-1) <= ui.yuvFrame:size(2)
              and nresult.lx >= 1 and (nresult.lx+nresult.w-1) <= ui.yuvFrame:size(3)
              and nresult.change_x < 1.3 and nresult.change_x > 0.7
              and nresult.change_y < 1.3 and nresult.change_y > 0.7
