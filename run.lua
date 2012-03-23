@@ -89,6 +89,9 @@ op:option{'-T', '--tracker', action='store', dest='tracker',
 op:option{'-A', '--activelearning', action='store_true', dest='activeLearning',
           help='turn on active learning'}
 
+op:option{'-S', '--tracksingle', action='store_true', dest='tracksingle',
+          help='track only one object for each class'}
+
 op:option{'-d', '--downsampling', action='store', dest='downsampling',
           help='downsampling for recognition/processing',
           default=2}

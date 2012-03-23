@@ -51,32 +51,51 @@ c.match = inline.load [[
 -- detect blobs in a map, and return a list of bounding boxes {lx,rx,ty,by}
 -- the map is assumed to be a map of connected components (e.g. each component has a
 -- unique value)
--- a second arg 'ignore' can be used to ignore a value (typically the background)
+-- second arg is the ids of each blob
+-- a third arg 'maxpts' can be used to specify one blob for each class 
+-- a fourth arg 'ignore' can be used to ignore a value (typically the background)
 c.getblobs = inline.load [[
       // get args
       const void* torch_FloatTensor_id = luaT_checktypename2id(L, "torch.FloatTensor");
       const void* torch_LongTensor_id = luaT_checktypename2id(L, "torch.LongTensor");
       THFloatTensor *input = luaT_checkudata(L, 1, torch_FloatTensor_id);
       THLongTensor *ids = luaT_checkudata(L, 2, torch_LongTensor_id);
+      THLongTensor *maxpts = 0;
       float ignore = 0;
-      if (lua_isnumber(L, 3)) ignore = lua_tonumber(L, 3);
+      if (luaT_isudata(L, 3, torch_LongTensor_id)) {
+         maxpts = luaT_checkudata(L, 3, torch_LongTensor_id);
+         if (lua_isnumber(L, 4)) ignore = lua_tonumber(L, 4);
+      }
+      else {
+         if (lua_isnumber(L, 3)) ignore = lua_tonumber(L, 3);
+      }
 
       // get raw pointers
       float *input_data = THFloatTensor_data(input);
       long *ids_data = THLongTensor_data(ids);
+      long *maxpts_data = 0;
+      if(maxpts) maxpts_data = THLongTensor_data(maxpts); 
 
       // dims
       int iheight = input->size[0];
       int iwidth = input->size[1];
+      int nclasses;
+      if(maxpts) nclasses = maxpts->size[0];
 
       // create table for results
       lua_newtable(L);                       // boxes = {}
       int boxes = lua_gettop(L);
+      int maxboxes;
+      if(maxpts) {
+         lua_newtable(L);
+         maxboxes = lua_gettop(L);
+      }
 
       // loop over pixels
       int x,y;
       int val,id;
       int idx = 0;
+      int maxpt_x, maxpt_y;
       for (x=0; x<iwidth; x++) {
          for (y=0; y<iheight; y++) {
             val = input_data[y*iwidth+x];
@@ -125,8 +144,19 @@ c.getblobs = inline.load [[
                   lua_rawseti(L, entry, 4);  // boxes[val][4] = y
                   lua_pop(L,1);
                }
+               if (maxpts) {
+                  maxpt_x = maxpts_data[id*2];
+                  maxpt_y = maxpts_data[id*2+1];
+                  if( (x+1 == maxpt_x) && (y+1 == maxpt_y) ) {
+                     lua_rawgeti(L,boxes,val);     // boxes[val]
+                     lua_rawseti(L,maxboxes,id);
+                  }
+               }
             }
          }
+      }
+      if (maxpts) {
+         lua_remove(L,boxes);
       }
 
       // return boxes

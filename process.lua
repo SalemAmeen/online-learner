@@ -349,8 +349,21 @@ local function process (ui)
    local graph = imgraph.graph(globs.winners:type('torch.FloatTensor'), 4)
    local components = imgraph.connectcomponents(graph, 0.5)
    -- find bounding boxes of blobs
-   globs.blobs = c.getblobs(components, globs.winners, #ui.classes+1)
-   --
+   if options.tracksingle then
+      -- might not work for multiple object classes, just a stand-in anyway
+      local maxpos=torch.LongTensor(#ui.classes,2)
+      for id = 1,#ui.classes do
+         local prow,yrow = torch.max(globs.distributions[id],1)
+         local p,x = torch.max(prow,2)
+         local x=x[1][1]
+         local y=yrow[1][x]
+         maxpos[id][1] = x
+         maxpos[id][2] = y
+      end
+      globs.blobs = c.getblobs(components, globs.winners, maxpos, #ui.classes+1)
+   else
+      globs.blobs = c.getblobs(components, globs.winners, #ui.classes+1)
+   end
    profiler:lap('estimate-distributions')
 
    ------------------------------------------------------------
@@ -378,6 +391,9 @@ local function process (ui)
          -- make sure it doesnt already exist from the tracker:
          local exists = false
          for _,res in ipairs(globs.results) do
+            if options.tracksingle and id == res.id then
+               exists = true
+            end
             if (lx+boxw) > res.lx and lx < (res.lx+res.w) and (ty+boxh) > res.ty and ty < (res.ty+res.h) then
                -- clears this object from recognition
                exists = true
