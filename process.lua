@@ -396,7 +396,7 @@ local function process (ui)
    -- (5) automatic learning of the object manifolds
    ------------------------------------------------------------
    profiler:start('auto-learn')
-   if ui.activeLearning then
+   if options.activeLearning then
       for _,res in ipairs(globs.results) do
          -- get center prediction
          local cx = (res.cx-off_x-1)/downs/encoder_dw+1

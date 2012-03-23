@@ -58,12 +58,11 @@ qt.connect(qt.QtLuaListener(widget.pushButton_disp),
            end)
 
 -- learn on/off
-ui.activeLearning = false
 qt.connect(qt.QtLuaListener(widget.pushButton_learn),
            'sigMousePress(int,int,QByteArray,QByteArray,QByteArray)',
            function (...)
-              ui.activeLearning = not ui.activeLearning
-              if ui.activeLearning then
+              options.activeLearning = not ui.activeLearning
+              if options.activeLearning then
                  ui.logit('auto-learning is on !')
               else
                  ui.logit('auto-learning off...')
@@ -109,6 +108,10 @@ widget:show()
 -- provide log
 ui.log = {}
 ui.logit = function(str, color) table.insert(ui.log,{str=str, color=color or 'black'}) end
+-- active learning on from options?
+if options.activeLearning then
+   ui.logit('auto-learning is on !')
+end
 
 -- return ui
 return ui

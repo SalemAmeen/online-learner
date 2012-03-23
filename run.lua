@@ -86,6 +86,9 @@ op:option{'-T', '--tracker', action='store', dest='tracker',
           help='tracking algorithm',
           default='simple'}
 
+op:option{'-A', '--activelearning', action='store_true', dest='activeLearning',
+          help='turn on active learning'}
+
 op:option{'-d', '--downsampling', action='store', dest='downsampling',
           help='downsampling for recognition/processing',
           default=2}
