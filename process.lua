@@ -7,6 +7,8 @@ globs = {}
 globs.results = {}
 -- stores an image patch and its associated dense features (prototype)
 globs.memory = {}
+-- count frames
+globs.frame = 1
 
 -- some options
 local downs = options.downsampling
@@ -23,10 +25,13 @@ elseif options.source == 'video' then
                          height=options.height, fps=options.fps,
                          length=options.length}
 elseif options.source == 'dataset' then
-   io.input(sys.concat(options.dspath,'init.txt'))
-   gt = {}
+   local gtfile = torch.DiskFile(sys.concat(options.dspath,'init.txt'),'r')
+   if options.dsoutput then
+      globs.dsoutfile = torch.DiskFile(options.dsoutput,'w')
+   end
+   gt = {file=gtfile}
    function gt:next()
-      line = io.read('*line')
+      local line = self.file:readString('*line')
       local _, _, lx, ty, rx, by = string.find(line, '(.*),(.*),(.*),(.*)')
       self.lx = tonumber(lx)
       self.ty = tonumber(ty)
@@ -36,7 +41,8 @@ elseif options.source == 'dataset' then
    gt:next()
    boxw = gt.rx - gt.lx
    boxh = gt.by - gt.ty
-   io.input(sys.concat(options.dspath,'gt.txt'))
+   gt.file:close()
+   gt.file = torch.DiskFile(sys.concat(options.dspath,'gt.txt'),'r')
 
    require 'ffmpeg'
    source = ffmpeg.Video{path=options.dspath, encoding=options.dsencoding,
@@ -52,7 +58,7 @@ if options.source == 'dataset' then
    rescaler = nn.SpatialReSampling{owidth=options.width/downs,
                                    oheight=options.height/downs}
    ui.learn = {x=(gt.lx+gt.rx)/2, y=(gt.ty+gt.by)/2,
-               id=ui.currentId, class=ui.currentClass}
+               id=1, class='dataset target'}
 else
    rescaler = nn.SpatialReSampling{owidth=options.width/downs+3,
                                    oheight=options.height/downs+3}
@@ -476,6 +482,28 @@ local function process (ui)
       -- done
       ui.learn = nil
       profiler:lap('learn-new-view')
+   end
+
+   if options.dsoutput then
+      local res = globs.results[1]
+      if res then
+         globs.dsoutfile:writeString(res.lx .. ',' .. res.ty .. ',' ..
+                                     res.lx+res.w .. ',' .. res.ty+res.h)
+      else
+         globs.dsoutfile:writeString('NaN,NaN,NaN,Nan')
+      end
+      globs.dsoutfile:writeString('\n')
+   end
+
+   globs.frame = globs.frame + 1
+   if options.source == 'dataset' or options.source == 'video' then
+      if globs.frame > source.nframes then
+         ui.stop = true
+         if globs.dsoutfile then
+            globs.dsoutfile:close()
+         end
+         ui.logit('you have reached the end of the video')
+      end
    end
 end
 

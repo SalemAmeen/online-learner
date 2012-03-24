@@ -66,6 +66,9 @@ op:option{'-n', '--dsencoding', action='store', dest='dsencoding',
           help='dataset image format',
           default='jpg'}
 
+op:option{'-O', '--dsoutput', action='store', dest='dsoutput',
+          help='file to save tracker output to, for dataset only'}
+
 op:option{'-e', '--encoder', action='store', dest='encoder',
           help='path to encoder module (typically a convnet, sparsifier, ...)',
           default='encoder.net'}

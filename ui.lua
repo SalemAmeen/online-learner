@@ -16,7 +16,9 @@ qt.connect(timer,
               ui.threshold = widget.verticalSlider.value / 1000
               process(ui)
               display(ui)
-              timer:start()
+              if not ui.stop then
+                 timer:start()
+              end
            end)
 ui.timer = timer
 
