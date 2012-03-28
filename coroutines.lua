@@ -145,8 +145,8 @@ c.getblobs = inline.load [[
                   lua_pop(L,1);
                }
                if (maxpts) {
-                  maxpt_x = maxpts_data[id*2];
-                  maxpt_y = maxpts_data[id*2+1];
+                  maxpt_x = maxpts_data[(id-1)*2];
+                  maxpt_y = maxpts_data[(id-1)*2+1];
                   if( (x+1 == maxpt_x) && (y+1 == maxpt_y) ) {
                      lua_rawgeti(L,boxes,val);     // boxes[val]
                      lua_rawseti(L,maxboxes,id);
