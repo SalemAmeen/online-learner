@@ -1,24 +1,8 @@
-
 -- global ui object
+-- holds ui state and defines listeners and functions for manipulating it
 local ui = {}
 
 -- setup gui
-local timer = qt.QTimer()
-timer.interval = 10
-timer.singleShot = true
---timer:start()
-ui.start = function()
-              timer:start()
-           end
-qt.connect(timer,
-           'timeout()',
-           function()
-              ui.threshold = widget.verticalSlider.value / 1000
-              process(ui)
-              display(ui)
-              timer:start()
-           end)
-ui.timer = timer
 
 -- connect all buttons to actions
 ui.classes = {widget.pushButton_1, widget.pushButton_2, widget.pushButton_3, 
@@ -61,8 +45,8 @@ qt.connect(qt.QtLuaListener(widget.pushButton_disp),
 qt.connect(qt.QtLuaListener(widget.pushButton_learn),
            'sigMousePress(int,int,QByteArray,QByteArray,QByteArray)',
            function (...)
-              options.activeLearning = not ui.activeLearning
-              if options.activeLearning then
+              state.autolearn = not state.autolearn
+              if state.autolearn then
                  ui.logit('auto-learning is on !')
               else
                  ui.logit('auto-learning off...')
@@ -108,10 +92,36 @@ widget:show()
 -- provide log
 ui.log = {}
 ui.logit = function(str, color) table.insert(ui.log,{str=str, color=color or 'black'}) end
--- active learning on from options?
-if options.activeLearning then
-   ui.logit('auto-learning is on !')
+
+function ui.proc()
+   ------------------------------------------------------------
+   -- clear memory / save / load session
+   ------------------------------------------------------------
+   if ui.forget then
+      ui.logit('clearing memory')
+      state.memory = {}
+      state.results = {}
+      ui.forget = false
+   end
+   if ui.save then
+      local filen = 'scratch/' .. options.file
+      ui.logit('saving memory to ' .. filen)
+      local file = torch.DiskFile(filen,'w')
+      file:writeObject(state.memory)
+      file:close()
+      ui.save = false
+   end
+   if ui.load then
+      local filen = 'scratch/' .. options.file
+      ui.logit('reloading memory from ' .. filen)
+      local file = torch.DiskFile(filen)
+      local loaded = file:readObject()
+      state.memory = loaded
+      file:close()
+      ui.load = false
+   end
 end
+
 
 -- return ui
 return ui
