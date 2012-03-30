@@ -92,7 +92,7 @@ end
 
 local function simpletracker(ui, result)
    -- new result:
-   local nresult = {class=result.class, id=result.id}
+   local nresult = {class=result.class, id=result.id, source=result.source}
 
    -- get box around result
    local box = ui.rawFrameP:narrow(3,result.lx,result.w):narrow(2,result.ty,result.h)
@@ -148,7 +148,7 @@ end
 
 local function fbtracker(ui, result)
    -- new result:
-   local nresult = {class=result.class, id=result.id}
+   local nresult = {class=result.class, id=result.id, source=result.source}
 
    -- track points
    --
@@ -222,6 +222,7 @@ local function fbtracker(ui, result)
    -- new top, left position
    nresult.lx = nresult.cx - nresult.w/2
    nresult.ty = nresult.cy - nresult.h/2
+   
 
    return nresult
 end
@@ -305,6 +306,7 @@ local function process (ui)
              and nresult.change_x < 1.3 and nresult.change_x > 0.7
              and nresult.change_y < 1.3 and nresult.change_y > 0.7
              and nresult.flow_x < 100 and nresult.flow_y < 100 then
+			nresult.source=1
             table.insert(globs.results, nresult)
          else
            print('dropping tracked result:')
@@ -385,7 +387,7 @@ local function process (ui)
          end
          if not exists then
             local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, h=boxh,
-                             class=ui.classes[id].text:tostring(), id=id}
+                             class=ui.classes[id].text:tostring(), id=id, source=2}
             table.insert(globs.results, nresult)
          end
       end
@@ -440,7 +442,7 @@ local function process (ui)
 
       -- and create a result !!
       local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, h=boxh,
-                       class=ui.classes[ui.learn.id].text:tostring(), id=ui.learn.id}
+                       class=ui.classes[ui.learn.id].text:tostring(), id=ui.learn.id, source=2}
       table.insert(globs.results, nresult)
 
       -- remap to smaller proc map

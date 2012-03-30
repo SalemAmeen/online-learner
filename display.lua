@@ -69,7 +69,13 @@ local function display(ui)
       local x = res.lx
       local y = res.ty
       painter:setcolor(color)
+      if(res.source==1)then
       painter:setlinewidth(3)
+	  end
+	  if(res.source==2) then
+	  painter:setlinewidth(6)
+	  end
+		
       painter:rectangle(x * window_zoom, y * window_zoom, w * window_zoom, h * window_zoom)
       painter:stroke()
       painter:setfont(qt.QFont{serif=false,italic=false,size=14})
