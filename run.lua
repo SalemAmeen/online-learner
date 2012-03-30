@@ -1,4 +1,4 @@
-#!/usr/bin/env qlua
+#!/usr/bin/env torch
 ------------------------------------------------------------
 -- xLearner == live/online learning with cortex-like capabilities
 -- this script provides a set of functions to experiment
