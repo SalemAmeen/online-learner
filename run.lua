@@ -122,27 +122,32 @@ options.t_sizechange_lthreshold = 0.7
 options.t_sizechange_uthreshold = 1.3
 -- upper threshold for flow in tracker
 options.t_flow_uthreshold = 100
+-- class names
+options.classes = {'Object 1','Object 2','Object 3',
+                   'Object 4','Object 5','Object 6'}
 
 -- profiler
 profiler = xlua.Profiler()
 
--- load gui and display routine
--- TODO: don't load if --nogui, fix state.classes
--- setup GUI (external UI file)
-require 'qt'
-require 'qtwidget'
-require 'qtuiloader'
-widget = qtuiloader.load('g.ui')
-painter = qt.QtLuaPainter(widget.frame)
 
-display = require 'display'
-ui = require 'ui'
 
 -- load required submodules
-source = require 'source'
 state = require 'state'
+source = require 'source'
 process = require 'process'
 tracker = require 'tracker'
+-- load gui and display routine, if necessary
+if not options.nogui then
+   -- setup GUI (external UI file)
+   require 'qt'
+   require 'qtwidget'
+   require 'qtuiloader'
+   widget = qtuiloader.load('g.ui')
+   painter = qt.QtLuaPainter(widget.frame)
+
+   display = require 'display'
+   ui = require 'ui'
+end
 
 -- end definition of global variables
 

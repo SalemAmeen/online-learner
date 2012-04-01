@@ -26,44 +26,42 @@ state.winners = torch.Tensor()
 -- winner is the same, excluding where the winner is the background
 state.blobs = {}
 
-state.classes = ui.classes
-state.colors = ui.colors
+-- hold the postion and class of a prototype to be added
+state.learn = nil
+
+-- flag that the end of video or dataset has been reached
+state.finished = false
+
+-- options
+state.classes = options.classes
 state.threshold = options.recognition_lthreshold
 state.autolearn = options.autolearn
 
 
 if options.nogui then
-   ui = nil
    function state.begin()
-      while state.frame < source.nframes do
+      while not state.finished do
          profiler:start('full-loop','fps')
          process()
          profiler:lap('full-loop')
       end
    end
-   function state.logit(msg,color)
+   function state.logit(msg,id)
       print(msg)
    end
 else
-   local timer = qt.QTimer()
    local function loop()
       profiler:start('full-loop','fps')
       process()
       display.update()
       profiler:lap('full-loop')
       display.log()
-      timer:start()      
    end
-   timer.interval = 10
-   timer.singleShot = true
-   qt.connect(timer,
-              'timeout()',
-              loop)
    function state.begin()
-      timer:start()
+      display.begin(loop)
    end
-   function state.logit(msg,color)
-      ui.logit(msg,color)
+   function state.logit(msg,id)
+      ui.logit(msg,ui.colors[id])
    end
 end
 

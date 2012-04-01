@@ -6,7 +6,7 @@ function display.update()
    -- resize display ?
    if ui.resize then
       if options.display >= 1 then
-         widget.geometry = qt.QRect{x=100,y=100,width=720+options.box/options.downs*#ui.classes,height=780}
+         widget.geometry = qt.QRect{x=100,y=100,width=720+options.boxw/options.downs*#ui.classes,height=780}
       else
          widget.geometry = qt.QRect{x=100,y=100,width=720,height=780}
       end
@@ -42,6 +42,7 @@ function display.update()
 
    if options.source == 'dataset' then
       -- draw a box around ground truth
+      local gt = source.gt
       local w = gt.rx - gt.lx
       local h = gt.by - gt.ty
       local x = gt.lx
@@ -130,7 +131,7 @@ function display.update()
 
       -- display RED bounding box, when autolearn is active
       _red_box_ = not _red_box_
-      if ui.activeLearning and _red_box_ then
+      if state.autolearn and _red_box_ then
          local x = 4
          local y = 4
          local w = state.rawFrame:size(3)
@@ -186,15 +187,29 @@ function display.save()
               .. string.format('%05d',display._fidx_) .. '.png', t)
 end
 
+-- display loop for after video/dataset has finished
 local timer = qt.QTimer()
 timer.interval = 10
 timer.singleShot = true
-qt.connect(timer,
-           'timeout()',
-           function()
-              display.update()
-              timer:start()
-           end)
-display.timer = timer
+function display.begin(loop)
+   local function finishloop()
+      if state.finished then
+         qt.connect(timer,
+                    'timeout()',
+                    function() 
+                       display.update()
+                       timer:start()
+                    end)
+      else
+         loop()
+         timer:start()
+      end
+   end
+   qt.connect(timer,
+              'timeout()',
+              finishloop)
+   timer:start()      
+end
+
 
 return display

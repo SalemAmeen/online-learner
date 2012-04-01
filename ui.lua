@@ -12,16 +12,17 @@ ui.classes = {widget.pushButton_1, widget.pushButton_2, widget.pushButton_3,
 ui.colors = {'blue', 'green', 'orange', 'cyan', 'purple', 'brown', 'gray', 'red', 'yellow'}
 
 -- set current class to learn
-ui.currentId = 1
-ui.currentClass = ui.classes[ui.currentId].text:tostring()
 for i,button in ipairs(ui.classes) do
+   button.text = state.classes[i]
    qt.connect(qt.QtLuaListener(button),
               'sigMousePress(int,int,QByteArray,QByteArray,QByteArray)',
               function (...)
                  ui.currentId = i
-                 ui.currentClass = ui.classes[ui.currentId].text:tostring()
+                 ui.currentClass = state.classes[i] 
               end)
 end
+ui.currentId = 1
+ui.currentClass = state.classes[ui.currentId]
 
 -- reset
 qt.connect(qt.QtLuaListener(widget.pushButton_forget),
@@ -82,7 +83,7 @@ qt.connect(qt.QtLuaListener(widget),
            'sigMousePress(int,int,QByteArray,QByteArray,QByteArray)',
            function (...)
               if ui.mouse then
-                 ui.learn = {x=ui.mouse.x, y=ui.mouse.y, id=ui.currentId, class=ui.currentClass}
+                 state.learn = {x=ui.mouse.x, y=ui.mouse.y, id=ui.currentId, class=ui.currentClass}
               end
            end)
 

@@ -31,11 +31,12 @@ elseif options.source == 'dataset' then
    io.input(sys.concat(options.dspath,'gt.txt'))
    source.gt = gt
 
-   local function wrap(self)
+   local oldforward = source.forward
+   local function gtwrap(self)
       self.gt:next()
-      self:forward()
+      return oldforward(self)
    end
-   source.forward = wrap
+   source.forward = gtwrap
 end
 
 if options.source ~= 'dataset' then
@@ -43,13 +44,25 @@ if options.source ~= 'dataset' then
    options.boxw = options.box
 else 
    --ignore downsampling, set so that width and height are at least 64px
-   options.downs = math.min(boxh, boxw)/64
-   ui.learn = {x=(source.gt.lx+source.gt.rx)/2, 
-               y=(source.gt.ty+source.gt.by)/2,
-               id=ui.currentId, class=ui.currentClass}
+   options.downs = math.min(options.boxh, options.boxw)/64
+   state.learn = {x=(source.gt.lx+source.gt.rx)/2, 
+                 y=(source.gt.ty+source.gt.by)/2,
+                 id=1, class=state.classes[1]}
+end
+
+if options.source == 'dataset' or options.source == 'video' then
+   local oldforward = source.forward
+   local function finishwrap(self)
+      if self.current == self.nframes then
+         state.finished = true
+      end
+      return oldforward(self)
+   end
+   source.forward = finishwrap
 end
 
 local rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
+-- originally owidth and oheight had +3, not sure why, removed for now
 local rescaler = nn.SpatialReSampling{owidth=options.width/options.downs,
                                    oheight=options.height/options.downs}
 

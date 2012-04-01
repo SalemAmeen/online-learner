@@ -120,7 +120,7 @@ local function process()
          end
          if not exists then
             local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, h=boxh,
-                             class=state.classes[id].text:tostring(), id=id}
+                             class=state.classes[id], id=id}
             table.insert(state.results, nresult)
          end
       end
@@ -139,8 +139,7 @@ local function process()
          local recog = state.distributions[res.id][cy][cx]
          if recog < (state.threshold*0.9) then
             -- auto learn
-            state.logit('auto-learning [' .. res.class .. ']',
-                        state.colors[res.id])
+            state.logit('auto-learning [' .. res.class .. ']',res.id)
 
             -- compute x,y coordinates
             local lx = math.min(math.max(res.cx-boxw/2,0),state.yuvFrame:size(3)-boxw)
@@ -167,16 +166,17 @@ local function process()
    ------------------------------------------------------------
    -- (6) capture new prototype, upon user request
    ------------------------------------------------------------
-   if ui and ui.learn then
+   if state.learn then
       profiler:start('learn-new-view')
       -- compute x,y coordinates
-      local lx = math.min(math.max(ui.learn.x-boxw/2,0),state.yuvFrame:size(3)-boxw)
-      local ty = math.min(math.max(ui.learn.y-boxh/2,0),state.yuvFrame:size(2)-boxh)
-      ui.logit('adding [' .. ui.learn.class .. '] at ' .. lx .. ',' .. ty, ui.colors[ui.learn.id])
+      local lx = math.min(math.max(state.learn.x-boxw/2,0),state.yuvFrame:size(3)-boxw)
+      local ty = math.min(math.max(state.learn.y-boxh/2,0),state.yuvFrame:size(2)-boxh)
+      state.logit('adding [' .. state.learn.class .. '] at ' .. lx 
+                  .. ',' .. ty, state.learn.id)
 
       -- and create a result !!
       local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, h=boxh,
-                       class=ui.classes[ui.learn.id].text:tostring(), id=ui.learn.id}
+                       class=state.classes[state.learn.id], id=state.learn.id}
       table.insert(state.results, nresult)
 
       -- remap to smaller proc map
@@ -190,11 +190,11 @@ local function process()
       local code = encoder_patch:forward(patch):clone()
 
       -- store patch and its code
-      state.memory[ui.learn.id] = state.memory[ui.learn.id] or {}
-      table.insert(state.memory[ui.learn.id], {patch=patch, code=code})
+      state.memory[state.learn.id] = state.memory[state.learn.id] or {}
+      table.insert(state.memory[state.learn.id], {patch=patch, code=code})
 
       -- done
-      ui.learn = nil
+      state.learn = nil
       profiler:lap('learn-new-view')
    end
 end
