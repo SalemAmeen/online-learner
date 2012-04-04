@@ -1,63 +1,10 @@
 -- C coroutines
 local c = require 'coroutines'
 
--- report results
-globs = {}
--- stores the position and bounds of tracked objects
-globs.results = {}
--- stores an image patch and its associated dense features (prototype)
-globs.memory = {}
-
 -- some options
-local downs = options.downsampling
+local downs = options.downs
 local boxh = options.boxh
 local boxw = options.boxw
-
--- camera source, rescaler, color space
-if options.source == 'camera' then
-   require 'camera'
-   source = image.Camera{}
-elseif options.source == 'video' then
-   require 'ffmpeg'
-   source = ffmpeg.Video{path=options.video, width=options.width,
-                         height=options.height, fps=options.fps,
-                         length=options.length}
-elseif options.source == 'dataset' then
-   io.input(sys.concat(options.dspath,'init.txt'))
-   gt = {}
-   function gt:next()
-      line = io.read('*line')
-      local _, _, lx, ty, rx, by = string.find(line, '(.*),(.*),(.*),(.*)')
-      self.lx = tonumber(lx)
-      self.ty = tonumber(ty)
-      self.rx = tonumber(rx)
-      self.by = tonumber(by)
-   end
-   gt:next()
-   boxw = gt.rx - gt.lx
-   boxh = gt.by - gt.ty
-   io.input(sys.concat(options.dspath,'gt.txt'))
-
-   require 'ffmpeg'
-   source = ffmpeg.Video{path=options.dspath, encoding=options.dsencoding,
-                         loaddump=true, load=false}
-   options.width = source.width
-   options.height = source.height
-end
-
-rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
-if options.source == 'dataset' then
-   --ignore downsampling, set so that width and height are at least 64px
-   downs = math.min(boxh, boxw)/64
-   rescaler = nn.SpatialReSampling{owidth=options.width/downs,
-                                   oheight=options.height/downs}
-   ui.learn = {x=(gt.lx+gt.rx)/2, y=(gt.ty+gt.by)/2,
-               id=ui.currentId, class=ui.currentClass}
-else
-   rescaler = nn.SpatialReSampling{owidth=options.width/downs+3,
-                                   oheight=options.height/downs+3}
-end
-
 
 -- encoder
 print('loading encoder:')
@@ -90,268 +37,53 @@ if options.target == 'neuflow' then
    encoder_full = require 'compile-neuflow'
 end
 
-local function simpletracker(ui, result)
-   -- new result:
-   local nresult = {class=result.class, id=result.id, source=result.source}
-
-   -- get box around result
-   local box = ui.rawFrameP:narrow(3,result.lx,result.w):narrow(2,result.ty,result.h)
-
-   -- track points
-   nresult.trackPointsP = opencv.GoodFeaturesToTrack{image=box, count=100}
-   if nresult.trackPointsP:dim() < 2 then
-      return nil
-   end
-   local nbpoints = nresult.trackPointsP:size(1)
-   nresult.trackPointsP:narrow(2,1,1):add(result.lx-1)
-   nresult.trackPointsP:narrow(2,2,1):add(result.ty-1)
-
-   -- track using Pyramidal Lucas Kanade
-   nresult.trackPoints = opencv.TrackPyrLK{pair={ui.rawFrameP,ui.rawFrame},
-                                           points_in=nresult.trackPointsP}
-
-   -- estimate median flow
-   local flows = torch.Tensor(nbpoints, 2)
-   flows:narrow(2,1,1):copy(nresult.trackPoints:narrow(2,1,1)):add(-nresult.trackPointsP:narrow(2,1,1))
-   flows:narrow(2,2,1):copy(nresult.trackPoints:narrow(2,2,1)):add(-nresult.trackPointsP:narrow(2,2,1))
-   flows:narrow(2,1,1):copy( torch.sort(flows:narrow(2,1,1)) )
-   flows:narrow(2,2,1):copy( torch.sort(flows:narrow(2,2,1)) )
-   nresult.flow_x = flows[math.ceil(nbpoints/2)][1]
-   nresult.flow_y = flows[math.ceil(nbpoints/2)][2]
-
-   -- update new result: new center position
-   nresult.cx = result.cx + nresult.flow_x
-   nresult.cy = result.cy + nresult.flow_y
-
-   -- estimate spread of previous and new points
-   -- previous
-   local std = torch.Tensor(nbpoints, 2):copy(nresult.trackPointsP)
-   local std_x = math.sqrt( std:narrow(2,1,1):add(-result.cx):pow(2):sum() / nbpoints )
-   local std_y = math.sqrt( std:narrow(2,2,1):add(-result.cy):pow(2):sum() / nbpoints )
-   -- new
-   std:copy(nresult.trackPoints)
-   local stdn_x = math.sqrt( std:narrow(2,1,1):add(-nresult.cx):pow(2):sum() / nbpoints )
-   local stdn_y = math.sqrt( std:narrow(2,2,1):add(-nresult.cy):pow(2):sum() / nbpoints )
-
-   -- update new result:
-   -- new width and height
-   nresult.change_x = stdn_x / std_x
-   nresult.change_y = stdn_y / std_y
-   nresult.w = result.w * nresult.change_x
-   nresult.h = result.h * nresult.change_y
-   -- new top, left position
-   nresult.lx = nresult.cx - nresult.w/2
-   nresult.ty = nresult.cy - nresult.h/2
-
-   return nresult
-end
-
-local function fbtracker(ui, result)
-   -- new result:
-   local nresult = {class=result.class, id=result.id, source=result.source}
-
-   -- track points
-   --
-   -- put tracking points on grid, every Npx pixels
-   local Npx = 9
-   local xpoints = torch.floor(torch.linspace(result.lx-1,result.lx-1+result.w, math.floor(result.w/Npx)))
-   local xn = xpoints:size(1)
-   local ypoints = torch.floor(torch.linspace(result.ty-1,result.ty-1+result.h, math.floor(result.h/Npx)))
-   local yn = ypoints:size(1)
-   local allnbpoints = xn * yn
-   local nbpoints = math.floor(allnbpoints/2)
-   local allTrackPointsP = torch.Tensor(allnbpoints,2)
-   for i = 1,xn do
-       local xy = allTrackPointsP:narrow(1,1+yn*(i-1),yn)
-       local x = xy:narrow(2,1,1)
-       local y = xy:narrow(2,2,1)
-       x:fill(xpoints[i])
-       y:copy(ypoints)
-   end
-   --
-   -- track using Pyramidal Lucas Kanade
-   local allTrackPointsF = opencv.TrackPyrLK{pair={ui.rawFrameP,ui.rawFrame},
-                                          points_in=allTrackPointsP}
-
-   local allTrackPointsB = opencv.TrackPyrLK{pair={ui.rawFrame,ui.rawFrameP},
-                                          points_in=allTrackPointsF}
-
-   -- get top 50% with smallest FB error
-   local sqdf=allTrackPointsB:mul(-1):add(allTrackPointsP):pow(2)
-   local sumsq = torch.sum(sqdf,2):select(2,1)
-   local _,idx=torch.sort(sumsq,1)
-   --
-   nresult.trackPointsP = torch.Tensor(nbpoints,2)
-   nresult.trackPoints = torch.Tensor(nbpoints,2)
-   for i = 1,nbpoints do
-       nresult.trackPointsP[i]:copy(allTrackPointsP[idx[i]])
-       nresult.trackPoints[i]:copy(allTrackPointsF[idx[i]])
-   end
-
-   -- estimate median flow
-   local flows = torch.Tensor(nbpoints, 2)
-   flows:narrow(2,1,1):copy(nresult.trackPoints:narrow(2,1,1)):add(-nresult.trackPointsP:narrow(2,1,1))
-   flows:narrow(2,2,1):copy(nresult.trackPoints:narrow(2,2,1)):add(-nresult.trackPointsP:narrow(2,2,1))
-   flows:narrow(2,1,1):copy( torch.sort(flows:narrow(2,1,1)) )
-   flows:narrow(2,2,1):copy( torch.sort(flows:narrow(2,2,1)) )
-   nresult.flow_x = flows[math.ceil(nbpoints/2)][1]
-   nresult.flow_y = flows[math.ceil(nbpoints/2)][2]
-
-   -- update new result: new center position
-   nresult.cx = result.cx + nresult.flow_x
-   nresult.cy = result.cy + nresult.flow_y
-
-   -- ratio between current point distance and previous point distance for each pair of points
-   local dratio = torch.Tensor(nbpoints*(nbpoints-1)/2, 2)
-   local offset = 0
-   for i = 1,nbpoints do
-       for j = i+1,nbpoints do
-           dist=nresult.trackPoints[i]-nresult.trackPoints[j]
-           distP=nresult.trackPointsP[i]-nresult.trackPointsP[j]
-           dratio[offset+(j-i)]:copy(torch.cdiv(dist,distP))
-       end
-       offset = offset+(nbpoints-i)
-   end
-   dratio, _ = torch.sort(dratio,1)
-   nresult.change_x = dratio[math.ceil(dratio:size(1)/2)][1]
-   nresult.change_y = dratio[math.ceil(dratio:size(1)/2)][2]
-
-   -- new width and height
-   nresult.w = result.w * nresult.change_x
-   nresult.h = result.h * nresult.change_y
-   -- new top, left position
-   nresult.lx = nresult.cx - nresult.w/2
-   nresult.ty = nresult.cy - nresult.h/2
-   
-
-   return nresult
-end
-
-local trackers = {simple = simpletracker, fb = fbtracker}
-local track = trackers[options.tracker]
-
 -- grab camera frames, and process them
-local function process (ui)
-   -- profile loop
-   profiler:start('full-loop','fps')
-
-   ------------------------------------------------------------
-   -- clear memory / save / load session
-   ------------------------------------------------------------
-   if ui.forget then
-      ui.logit('clearing memory')
-      globs.memory = {}
-      globs.results = {}
-      ui.forget = false
-   end
-   if ui.save then
-      local filen = 'scratch/' .. options.file
-      ui.logit('saving memory to ' .. filen)
-      local file = torch.DiskFile(filen,'w')
-      file:writeObject(globs.memory)
-      file:close()
-      ui.save = false
-   end
-   if ui.load then
-      local filen = 'scratch/' .. options.file
-      ui.logit('reloading memory from ' .. filen)
-      local file = torch.DiskFile(filen)
-      local loaded = file:readObject()
-      globs.memory = loaded
-      file:close()
-      ui.load = false
-   end
-
+local function process()
    ------------------------------------------------------------
    -- (0) grab frame, get Y chanel and resize
    ------------------------------------------------------------
    profiler:start('get-frame')
-   -- store previous frame
-   ui.rawFrameP = ui.rawFrameP or torch.Tensor()
-   if ui.rawFrame then ui.rawFrameP:resizeAs(ui.rawFrame):copy(ui.rawFrame) end
-
-   -- capture next frame
-   ui.rawFrame = source:forward()
-   ui.rawFrame = ui.rawFrame:float()
-
-   -- global linear normalization of input frame
-   ui.rawFrame:add(-ui.rawFrame:min()):div(math.max(ui.rawFrame:max(),1e-6))
-
-   -- convert and rescale
-   ui.yuvFrame = rgb2yuv:forward(ui.rawFrame)
-   --ui.yFrame = ui.yuvFrame:narrow(1,1,1)
-   ui.procFrame = rescaler:forward(ui.yuvFrame)
-
+   source:getframe()
    profiler:lap('get-frame')
 
    ------------------------------------------------------------
    -- (1) track objects
    ------------------------------------------------------------
-   if ui.rawFrameP then
-      profiler:start('track-interest-points')
-
-      -- store prev results, and prev frame
-      globs.results_prev = globs.results
-      globs.results = {}
-
-      -- track features for each bounding box
-      for i,result in ipairs(globs.results_prev) do
-         local nresult = track(ui,result)
-
-         -- if result still in the fov, and didnt change too much, then keep it !
-         if not nresult then
-            print('dropping tracked result: no tracking points returns\n')
-         elseif nresult.ty >= 1 and (nresult.ty+nresult.h-1) <= ui.yuvFrame:size(2)
-             and nresult.lx >= 1 and (nresult.lx+nresult.w-1) <= ui.yuvFrame:size(3)
-             and nresult.change_x < 1.3 and nresult.change_x > 0.7
-             and nresult.change_y < 1.3 and nresult.change_y > 0.7
-             and nresult.flow_x < 100 and nresult.flow_y < 100 then
-			nresult.source=1
-            table.insert(globs.results, nresult)
-         else
-           print('dropping tracked result:')
-           print('change_x = ' .. nresult.change_x)
-           print('change_y = ' .. nresult.change_y)
-           print('flow_x = ' .. nresult.flow_x)
-           print('flow_y = ' .. nresult.flow_y)
-           print('')
-         end
-      end
-      profiler:lap('track-interest-points')
-   end
+   profiler:start('track-interest-points')
+   tracker()
+   profiler:lap('track-interest-points')
 
    ------------------------------------------------------------
    -- (2) perform full detection/recognition
    ------------------------------------------------------------
    profiler:start('encode-full-scene')
-   local denseFeatures = encoder_full:forward(ui.procFrame)
+   local denseFeatures = encoder_full:forward(state.procFrame)
    profiler:lap('encode-full-scene')
 
    ------------------------------------------------------------
    -- (3) estimate class distributions
    ------------------------------------------------------------
    profiler:start('estimate-distributions')
-   globs.distributions = globs.distributions or torch.Tensor()
-   globs.distributions:resize(#ui.classes+1, denseFeatures:size(2), denseFeatures:size(3)):zero()
+   state.distributions:resize(#state.classes+1, denseFeatures:size(2), denseFeatures:size(3)):zero()
    -- fill last class (background) with threshold value
-   globs.distributions[#ui.classes+1]:fill(ui.threshold)
+   state.distributions[#state.classes+1]:fill(state.threshold)
    local nfeatures = denseFeatures:size(1)
-   for id = 1,#ui.classes do
-      if globs.memory[id] then
+   for id = 1,#state.classes do
+      if state.memory[id] then
          -- estimate similarity of all protos with dense features
-         for _,proto in ipairs(globs.memory[id]) do
-            c.match(denseFeatures, proto.code, globs.distributions[id])
+         for _,proto in ipairs(state.memory[id]) do
+            c.match(denseFeatures, proto.code, state.distributions[id])
          end
       end
    end
    -- get max (winning category)
-   _, globs.winners = torch.max(globs.distributions,1)
-   globs.winners = globs.winners[1]
+   _, state.winners = torch.max(state.distributions,1)
+   state.winners = state.winners[1]
    -- get connected components
-   local graph = imgraph.graph(globs.winners:type('torch.FloatTensor'), 4)
+   local graph = imgraph.graph(state.winners:type('torch.FloatTensor'), 4)
    local components = imgraph.connectcomponents(graph, 0.5)
    -- find bounding boxes of blobs
-   globs.blobs = c.getblobs(components, globs.winners, #ui.classes+1)
+   state.blobs = c.getblobs(components, state.winners, #state.classes+1)
    --
    profiler:lap('estimate-distributions')
 
@@ -361,34 +93,35 @@ local function process (ui)
    -- (e.g. disappeared then came back...)
    ------------------------------------------------------------
    profiler:start('recognize')
-   local off_x = math.floor((ui.rawFrame:size(3) - globs.winners:size(2)*downs*encoder_dw)/2)
-   local off_y = math.floor((ui.rawFrame:size(2) - globs.winners:size(1)*downs*encoder_dw)/2)
-   for i,blob in pairs(globs.blobs) do
+   local off_x = math.floor((state.rawFrame:size(3) - state.winners:size(2)*downs*encoder_dw)/2)
+   local off_y = math.floor((state.rawFrame:size(2) - state.winners:size(1)*downs*encoder_dw)/2)
+   for i,blob in pairs(state.blobs) do
       -- calculate blob center
       local x = math.ceil((blob[1]+blob[2])/2)
       local y = math.ceil((blob[3]+blob[4])/2)
       local id = blob[5]
-      if id <= #ui.classes then
+      if id <= #state.classes then
+
          -- new potential object at this location:
          -- left x
          local lx = (x-1) * downs * encoder_dw + 1 + off_x - boxw/2
          -- top y
          local ty = (y-1) * downs * encoder_dw + 1 + off_y - boxh/2
          -- make sure box is in frame
-         lx = math.min(math.max(1,lx),ui.rawFrame:size(3)-boxw+1)
-         ty = math.min(math.max(1,ty),ui.rawFrame:size(2)-boxh+1)
+         lx = math.min(math.max(1,lx),state.rawFrame:size(3)-boxw+1)
+         ty = math.min(math.max(1,ty),state.rawFrame:size(2)-boxh+1)
          -- make sure it doesnt already exist from the tracker:
          local exists = false
-         for _,res in ipairs(globs.results) do
+         for _,res in ipairs(state.results) do
             if (lx+boxw) > res.lx and lx < (res.lx+res.w) and (ty+boxh) > res.ty and ty < (res.ty+res.h) then
                -- clears this object from recognition
                exists = true
             end
          end
          if not exists then
-            local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, h=boxh,
-                             class=ui.classes[id].text:tostring(), id=id, source=2}
-            table.insert(globs.results, nresult)
+            local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw,
+                             h=boxh, class=state.classes[id], id=id, source=4}
+            table.insert(state.results, nresult)
          end
       end
    end
@@ -398,33 +131,33 @@ local function process (ui)
    -- (5) automatic learning of the object manifolds
    ------------------------------------------------------------
    profiler:start('auto-learn')
-   if options.activeLearning then
-      for _,res in ipairs(globs.results) do
+   if state.autolearn then
+      for _,res in ipairs(state.results) do
          -- get center prediction
          local cx = (res.cx-off_x-1)/downs/encoder_dw+1
          local cy = (res.cy-off_y-1)/downs/encoder_dw+1
-         local recog = globs.distributions[res.id][cy][cx]
-         if recog < (ui.threshold*0.9) then
+         local recog = state.distributions[res.id][cy][cx]
+         if recog < (state.threshold*0.9) then
             -- auto learn
-            ui.logit('auto-learning [' .. res.class .. ']', ui.colors[res.id])
+            state.logit('auto-learning [' .. res.class .. ']',res.id)
 
             -- compute x,y coordinates
-            local lx = math.min(math.max(res.cx-boxw/2,0),ui.yuvFrame:size(3)-boxw)
-            local ty = math.min(math.max(res.cy-boxh/2,0),ui.yuvFrame:size(2)-boxh)
+            local lx = math.min(math.max(res.cx-boxw/2,0),state.yuvFrame:size(3)-boxw)
+            local ty = math.min(math.max(res.cy-boxh/2,0),state.yuvFrame:size(2)-boxh)
 
             -- remap to smaller proc map
             lx = lx / downs + 1
             ty = ty / downs + 1
 
             -- extract patch at that location
-            local patch = ui.procFrame:narrow(3,lx,boxw/downs):narrow(2,ty,boxh/downs):clone()
+            local patch = state.procFrame:narrow(3,lx,boxw/downs):narrow(2,ty,boxh/downs):clone()
 
             -- compute code for patch
             local code = encoder_patch:forward(patch):clone()
 
             -- store patch and its code
-            globs.memory[res.id] = globs.memory[res.id] or {}
-            table.insert(globs.memory[res.id], {patch=patch, code=code})
+            state.memory[res.id] = state.memory[res.id] or {}
+            table.insert(state.memory[res.id], {patch=patch, code=code})
          end
       end
    end
@@ -433,34 +166,36 @@ local function process (ui)
    ------------------------------------------------------------
    -- (6) capture new prototype, upon user request
    ------------------------------------------------------------
-   if ui.learn then
+   if state.learn then
       profiler:start('learn-new-view')
       -- compute x,y coordinates
-      local lx = math.min(math.max(ui.learn.x-boxw/2,0),ui.yuvFrame:size(3)-boxw)
-      local ty = math.min(math.max(ui.learn.y-boxh/2,0),ui.yuvFrame:size(2)-boxh)
-      ui.logit('adding [' .. ui.learn.class .. '] at ' .. lx .. ',' .. ty, ui.colors[ui.learn.id])
+      local lx = math.min(math.max(state.learn.x-boxw/2,0),state.yuvFrame:size(3)-boxw)
+      local ty = math.min(math.max(state.learn.y-boxh/2,0),state.yuvFrame:size(2)-boxh)
+      state.logit('adding [' .. state.learn.class .. '] at ' .. lx 
+                  .. ',' .. ty, state.learn.id)
 
       -- and create a result !!
-      local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, h=boxh,
-                       class=ui.classes[ui.learn.id].text:tostring(), id=ui.learn.id, source=2}
-      table.insert(globs.results, nresult)
+      local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, 
+                       h=boxh, class=state.classes[state.learn.id], 
+                       id=state.learn.id, source=6}
+      table.insert(state.results, nresult)
 
       -- remap to smaller proc map
       lx = lx / downs + 1
       ty = ty / downs + 1
 
       -- extract patch at that location
-      local patch = ui.procFrame:narrow(3,lx,boxw/downs):narrow(2,ty,boxh/downs):clone()
+      local patch = state.procFrame:narrow(3,lx,boxw/downs):narrow(2,ty,boxh/downs):clone()
 
       -- compute code for patch
       local code = encoder_patch:forward(patch):clone()
 
       -- store patch and its code
-      globs.memory[ui.learn.id] = globs.memory[ui.learn.id] or {}
-      table.insert(globs.memory[ui.learn.id], {patch=patch, code=code})
+      state.memory[state.learn.id] = state.memory[state.learn.id] or {}
+      table.insert(state.memory[state.learn.id], {patch=patch, code=code})
 
       -- done
-      ui.learn = nil
+      state.learn = nil
       profiler:lap('learn-new-view')
    end
 end

@@ -1,16 +1,12 @@
+--functions for manipulating ui
+local display = {}
 
--- setup GUI (external UI file)
-require 'qt'
-require 'qtwidget'
-require 'qtuiloader'
-widget = qtuiloader.load('g.ui')
-painter = qt.QtLuaPainter(widget.frame)
-
-local function display(ui)
+-- function to update display
+function display.update()
    -- resize display ?
    if ui.resize then
       if options.display >= 1 then
-         widget.geometry = qt.QRect{x=100,y=100,width=720+options.box/options.downsampling*#ui.classes,height=780}
+         widget.geometry = qt.QRect{x=100,y=100,width=720+options.boxw/options.downs*#ui.classes,height=780}
       else
          widget.geometry = qt.QRect{x=100,y=100,width=720,height=780}
       end
@@ -24,14 +20,14 @@ local function display(ui)
    window_zoom = 1
 
    -- image to display
-   local dispimg = ui.rawFrame
+   local dispimg = state.rawFrame
 
    -- overlay track points on input image
-   if options.display >= 2 and globs.results[1] then
+   if options.display >= 2 and state.results[1] then
       -- clone image
       dispimg = dispimg:clone()
       -- disp first result only
-      for _,res in ipairs(globs.results) do
+      for _,res in ipairs(state.results) do
          if res.trackPointsP and res.trackPointsP:size(1) > 1 then
             opencv.drawFlowlinesOnImage{pair={res.trackPointsP,res.trackPoints}, image=dispimg}
             dispimg:div(dispimg:max())
@@ -46,6 +42,7 @@ local function display(ui)
 
    if options.source == 'dataset' then
       -- draw a box around ground truth
+      local gt = source.gt
       local w = gt.rx - gt.lx
       local h = gt.by - gt.ty
       local x = gt.lx
@@ -57,11 +54,10 @@ local function display(ui)
       painter:setfont(qt.QFont{serif=false,italic=false,size=14})
       painter:moveto(x * window_zoom, (y-2) * window_zoom)
       painter:show('Ground truth')
-      gt:next()
    end
 
    -- draw a box around detections
-   for _,res in ipairs(globs.results) do
+   for _,res in ipairs(state.results) do
       local color = ui.colors[res.id]
       local legend = res.class
       local w = res.w
@@ -70,11 +66,11 @@ local function display(ui)
       local y = res.ty
       painter:setcolor(color)
       if(res.source==1)then
-      painter:setlinewidth(3)
-	  end
-	  if(res.source==2) then
-	  painter:setlinewidth(6)
-	  end
+         painter:setlinewidth(3)
+      end
+      if(res.source>2) then
+         painter:setlinewidth(6)
+      end
 		
       painter:rectangle(x * window_zoom, y * window_zoom, w * window_zoom, h * window_zoom)
       painter:stroke()
@@ -103,37 +99,37 @@ local function display(ui)
 
    -- display extra stuff
    if options.display >= 1 then
-      local sizew = options.boxw/options.downsampling
-      local sizeh = options.boxh/options.downsampling
+      local sizew = options.boxw/options.downs
+      local sizeh = options.boxh/options.downs
 
       -- display class distributions
       for id = 1,#ui.classes+1 do
-         image.display{image=globs.distributions[id],
+         image.display{image=state.distributions[id],
                        legend=(id==1 and 'class distributions') or nil,
                        win=painter,
-                       x=ui.rawFrame:size(3) + (id-1)*sizew,
+                       x=state.rawFrame:size(3) + (id-1)*sizew,
                        y=16,
                        zoom=window_zoom}
       end
 
       -- disp winner map
-      image.display{image=globs.winners,
+      image.display{image=state.winners,
                     legend='recognition',
                     win=painter,
-                    x=ui.rawFrame:size(3),
-                    y=globs.distributions:size(2) + 32,
+                    x=state.rawFrame:size(3),
+                    y=state.distributions:size(2) + 32,
                     min=1, max=#ui.classes+2,
                     zoom=window_zoom*2}
 
       -- display current protos
       for id = 1,#ui.classes do
-         if globs.memory[id] then
-            for k,proto in ipairs(globs.memory[id]) do
+         if state.memory[id] then
+            for k,proto in ipairs(state.memory[id]) do
                image.display{image=proto.patch,
                              legend=(k==1 and 'Obj-'..id) or nil,
                              win=painter,
-                             x=ui.rawFrame:size(3) + (id-1)*sizew,
-                             y=(k-1)*sizeh + globs.distributions:size(2)*3+48,
+                             x=state.rawFrame:size(3) + (id-1)*sizew,
+                             y=(k-1)*sizeh + state.distributions:size(2)*3+48,
                              zoom=window_zoom}
             end
          end
@@ -141,23 +137,30 @@ local function display(ui)
 
       -- display RED bounding box, when autolearn is active
       _red_box_ = not _red_box_
-      if ui.activeLearning and _red_box_ then
+      if state.autolearn and _red_box_ then
          local x = 4
          local y = 4
-         local w = ui.rawFrame:size(3)
-         local h = ui.rawFrame:size(2) 
+         local w = state.rawFrame:size(3)
+         local h = state.rawFrame:size(2)
          painter:setcolor('red')
          painter:setlinewidth(8)
          painter:rectangle(x * window_zoom, y * window_zoom, w * window_zoom, h * window_zoom)
          painter:stroke()
       end
-   end
-   profiler:lap('display')
 
+      -- update threshold
+      state.threshold = widget.verticalSlider.value / 1000
+   end
+   ui.proc()
+   profiler:lap('display')
+end
+
+
+function display.log()
    -- disp profiler results
    profiler:lap('full-loop')
    local x = 10
-   local y = ui.rawFrame:size(2)*window_zoom+20
+   local y = state.rawFrame:size(2)*window_zoom+20
    painter:setcolor('black')
    painter:setfont(qt.QFont{serif=false,italic=false,size=12})
    painter:moveto(x,y) painter:show('-------------- profiling ---------------')
@@ -177,12 +180,42 @@ local function display(ui)
    end
    painter:gend()
 
-   -- save screen to disk ?
    if options.save then
-      _fidx_ = (_fidx_ or 0) + 1
-      local t = painter:image():toTensor(3)
-      image.save(options.save .. '/' .. string.format('%05d',_fidx_) .. '.png', t)
+      display.save()
    end
 end
+
+function display.save()
+   -- save screen to disk
+   display._fidx_ = (display._fidx_ or 0) + 1
+   local t = painter:image():toTensor(3)
+   image.save(options.save .. '/'
+              .. string.format('%05d',display._fidx_) .. '.png', t)
+end
+
+-- display loop for after video/dataset has finished
+local timer = qt.QTimer()
+timer.interval = 10
+timer.singleShot = true
+function display.begin(loop)
+   local function finishloop()
+      if state.finished then
+         qt.connect(timer,
+                    'timeout()',
+                    function() 
+                       display.update()
+                       timer:start()
+                    end)
+      else
+         loop()
+         timer:start()
+      end
+   end
+   qt.connect(timer,
+              'timeout()',
+              finishloop)
+   timer:start()      
+end
+
 
 return display
