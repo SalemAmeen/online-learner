@@ -15,10 +15,13 @@ elseif options.source == 'dataset' then
    options.width = source.width
    options.height = source.height
 
-   io.input(sys.concat(options.dspath,'init.txt'))
-   local gt = {}
+   local gtfile = torch.DiskFile(sys.concat(options.dspath,'init.txt'),'r')
+   if options.dsoutput then
+      state.dsoutfile = torch.DiskFile(options.dsoutput,'w')
+   end
+   local gt = {file=gtfile}
    function gt:next()
-      line = io.read('*line')
+      local line = self.file:readString('*line')
       local _, _, lx, ty, rx, by = string.find(line, '(.*),(.*),(.*),(.*)')
       self.lx = tonumber(lx)
       self.ty = tonumber(ty)
@@ -28,7 +31,8 @@ elseif options.source == 'dataset' then
    gt:next()
    options.boxw = gt.rx - gt.lx
    options.boxh = gt.by - gt.ty
-   io.input(sys.concat(options.dspath,'gt.txt'))
+   gt.file:close()
+   gt.file = torch.DiskFile(sys.concat(options.dspath,'gt.txt'),'r')
    source.gt = gt
 
    local oldforward = source.forward
