@@ -1,4 +1,4 @@
-#!/usr/bin/env qlua
+#!/usr/bin/env torch
 ------------------------------------------------------------
 -- xLearner == live/online learning with cortex-like capabilities
 -- this script provides a set of functions to experiment
@@ -32,6 +32,12 @@ require 'nnx'
 require 'imgraph'
 require 'opencv'
 require 'openmp'
+
+-- do everything in single precision
+torch.setdefaulttensortype('torch.FloatTensor')
+
+
+-- begin global variable definitions
 
 -- parse args
 op = xlua.OptionParser('%prog [options]')
@@ -69,6 +75,9 @@ op:option{'-n', '--dsencoding', action='store', dest='dsencoding',
 op:option{'-O', '--dsoutput', action='store', dest='dsoutput',
           help='file to save tracker output to, for dataset only'}
 
+op:option{'-N', '--nogui', action='store_true', dest='nogui',
+          help='turn off the GUI display (only useful with dataset)'}
+
 op:option{'-e', '--encoder', action='store', dest='encoder',
           help='path to encoder module (typically a convnet, sparsifier, ...)',
           default='encoder.net'}
@@ -86,16 +95,16 @@ op:option{'-b', '--box', action='store', dest='box',
           default=128}
 
 op:option{'-T', '--tracker', action='store', dest='tracker',
-          help='tracking algorithm',
+          help='tracking algorithm: simple, fb, off',
           default='simple'}
 
-op:option{'-A', '--activelearning', action='store_true', dest='activeLearning',
-          help='turn on active learning'}
+op:option{'-A', '--autolearn', action='store_true', dest='autolearn',
+          help='turn on autolearning'}
 
 op:option{'-S', '--tracksingle', action='store_true', dest='tracksingle',
           help='track only one object for each class'}
 
-op:option{'-d', '--downsampling', action='store', dest='downsampling',
+op:option{'-d', '--downsampling', action='store', dest='downs',
           help='downsampling for recognition/processing',
           default=2}
 
@@ -109,25 +118,54 @@ op:option{'-f', '--file', action='store', dest='file',
 
 options,args = op:parse()
 
-options.boxh = options.box
-options.boxw = options.box
-
--- save ?
-if options.save then
-   os.execute('mkdir -p ' .. options.save)
-end
-
--- do everything in single precision
-torch.setdefaulttensortype('torch.FloatTensor')
+-- options which are not in the command line yet
+-- lower theshold for object recognition
+options.recognition_lthreshold = 0.8
+-- tracking thesholds (when to drop tracked object)
+-- lower threshold for size change in tracker
+options.t_sizechange_lthreshold = 0.7
+-- upper theshold for size change in tracker
+options.t_sizechange_uthreshold = 1.3
+-- upper threshold for flow in tracker
+options.t_flow_uthreshold = 100
+-- class names
+options.classes = {'Object 1','Object 2','Object 3',
+                   'Object 4','Object 5','Object 6'}
 
 -- profiler
 profiler = xlua.Profiler()
 
+
+
+-- load required submodules
+state = require 'state'
+source = require 'source'
+process = require 'process'
+tracker = require 'tracker'
+-- load gui and display routine, if necessary
+if not options.nogui then
+   -- setup GUI (external UI file)
+   require 'qt'
+   require 'qtwidget'
+   require 'qtuiloader'
+   widget = qtuiloader.load('g.ui')
+   painter = qt.QtLuaPainter(widget.frame)
+
+   display = require 'display'
+   ui = require 'ui'
+end
+
+-- end definition of global variables
+
+
+-- setup necessary directories
+-- save ?
+if options.save then
+   os.execute('mkdir -p ' .. options.save)
+end
 -- for memory files
 sys.execute('mkdir -p scratch')
 
--- load all submodules
-display = require 'display'
-ui = require 'ui'
-process = require 'process'
-ui.start()
+
+-- start execution
+state.begin()
