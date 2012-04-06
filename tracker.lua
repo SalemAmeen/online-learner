@@ -141,12 +141,8 @@ local trackers = { simple = simpletracker,
                    fb = fbtracker
                  }
 local tracker = trackers[options.tracker]
-if not tracker then
-   assert(options.tracker == 'off',
-          'invalid tracking algorithm ' .. options.tracker)
-end
 
-local function wrap()
+local function trackall()
    -- store prev results, and prev frame
    state.results_prev = state.results
    state.results = {}
@@ -179,4 +175,14 @@ local function wrap()
    end
 end
 
-return wrap
+local function tracknone()
+   state.results = {}
+end
+
+if not tracker then
+   assert(options.tracker == 'off',
+          'invalid tracking algorithm ' .. options.tracker)
+   return tracknone 
+else
+   return trackall
+end
