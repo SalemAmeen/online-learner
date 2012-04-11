@@ -31,6 +31,13 @@ state.learn = nil
 
 -- flag that the end of video or dataset has been reached
 state.finished = false
+state.finish = function()
+                  state.logit('you have reached the end of the video')
+                  if state.dsoutfile then
+                     state.dsoutfile:close()
+                  end
+               end
+
 
 -- options
 state.classes = options.classes
@@ -45,6 +52,7 @@ if options.nogui then
          process()
          profiler:lap('full-loop')
       end
+      state.finish()
    end
    function state.logit(msg)
       print(msg)
@@ -55,7 +63,7 @@ else
       process()
       display.update()
       profiler:lap('full-loop')
-      display.log()
+      display.results()
    end
    function state.begin()
       display.begin(loop)
