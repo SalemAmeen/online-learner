@@ -156,9 +156,8 @@ function display.update()
 end
 
 
-function display.log()
+function display.results()
    -- disp profiler results
-   profiler:lap('full-loop')
    local x = 10
    local y = state.rawFrame:size(2)*window_zoom+20
    painter:setcolor('black')
@@ -167,7 +166,17 @@ function display.log()
    profiler:displayAll{painter=painter, x=x, y=y+20, zoom=0.5}
 
    -- display log
+   display.log()
+
+   -- save screen to disk
+   if options.save then
+      display.save()
+   end
+end
+
+function display.log()
    x = 400
+   local y = state.rawFrame:size(2)*window_zoom+20
    painter:moveto(x,y) painter:show('-------------- log ---------------')
    for i = 1,#state.log do
       local txt = state.log[#state.log-i+1].str
@@ -179,14 +188,9 @@ function display.log()
       if i == 8 then break end
    end
    painter:gend()
-
-   if options.save then
-      display.save()
-   end
 end
 
 function display.save()
-   -- save screen to disk
    display._fidx_ = (display._fidx_ or 0) + 1
    local t = painter:image():toTensor(3)
    image.save(options.save .. '/'
@@ -200,12 +204,18 @@ timer.singleShot = true
 function display.begin(loop)
    local function finishloop()
       if state.finished then
+         state.finish()
+         qt.disconnect(timer,
+                       'timeout()',
+                       finishloop)
          qt.connect(timer,
                     'timeout()',
                     function() 
                        display.update()
+                       display.log()
                        timer:start()
                     end)
+         timer:start()
       else
          loop()
          timer:start()
