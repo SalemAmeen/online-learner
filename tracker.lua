@@ -70,6 +70,9 @@ local function fbtracker(result)
    local yn = ypoints:size(1)
    local allnbpoints = xn * yn
    local nbpoints = math.floor(allnbpoints/2)
+   if nbpoints < 2 then
+      return
+   end
    local allTrackPointsP = torch.Tensor(allnbpoints,2)
    for i = 1,xn do
        local xy = allTrackPointsP:narrow(1,1+yn*(i-1),yn)
