@@ -77,8 +77,8 @@ c.getblobs = inline.load [[
       int x,y;
       int val,id;
       int idx = 0;
-      for (x=0; x<iwidth; x++) {
-         for (y=0; y<iheight; y++) {
+      for (y=0; y<iheight; y++) {
+         for (x=0; x<iwidth; x++) {
             val = input_data[y*iwidth+x];
             id = ids_data[y*iwidth+x];
             if (id != ignore) {
