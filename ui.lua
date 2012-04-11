@@ -48,9 +48,9 @@ qt.connect(qt.QtLuaListener(widget.pushButton_learn),
            function (...)
               state.autolearn = not state.autolearn
               if state.autolearn then
-                 ui.logit('auto-learning is on !')
+                 state.logit('auto-learning is on !')
               else
-                 ui.logit('auto-learning off...')
+                 state.logit('auto-learning off...')
               end
            end)
 
@@ -90,23 +90,19 @@ qt.connect(qt.QtLuaListener(widget),
 widget.windowTitle = 'Live Learning'
 widget:show()
 
--- provide log
-ui.log = {}
-ui.logit = function(str, color) table.insert(ui.log,{str=str, color=color or 'black'}) end
-
 function ui.proc()
    ------------------------------------------------------------
    -- clear memory / save / load session
    ------------------------------------------------------------
    if ui.forget then
-      ui.logit('clearing memory')
+      state.logit('clearing memory')
       state.memory = {}
       state.results = {}
       ui.forget = false
    end
    if ui.save then
       local filen = 'scratch/' .. options.file
-      ui.logit('saving memory to ' .. filen)
+      state.logit('saving memory to ' .. filen)
       local file = torch.DiskFile(filen,'w')
       file:writeObject(state.memory)
       file:close()
@@ -114,7 +110,7 @@ function ui.proc()
    end
    if ui.load then
       local filen = 'scratch/' .. options.file
-      ui.logit('reloading memory from ' .. filen)
+      state.logit('reloading memory from ' .. filen)
       local file = torch.DiskFile(filen)
       local loaded = file:readObject()
       state.memory = loaded

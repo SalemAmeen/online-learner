@@ -46,7 +46,7 @@ if options.nogui then
          profiler:lap('full-loop')
       end
    end
-   function state.logit(msg,id)
+   function state.logit(msg)
       print(msg)
    end
 else
@@ -60,8 +60,15 @@ else
    function state.begin()
       display.begin(loop)
    end
-   function state.logit(msg,id)
-      ui.logit(msg,ui.colors[id])
+   -- provide log
+   state.log = {}
+   function state.logit(str,color)
+      -- color can be a class id (number) or a color name (string)
+      print(str)
+      if type(color) == 'number' then
+         color = ui.colors[color]
+      end
+      table.insert(state.log,{str=str, color=color or 'black'})
    end
 end
 
