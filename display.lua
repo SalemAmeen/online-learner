@@ -169,9 +169,9 @@ function display.log()
    -- display log
    x = 400
    painter:moveto(x,y) painter:show('-------------- log ---------------')
-   for i = 1,#ui.log do
-      local txt = ui.log[#ui.log-i+1].str
-      local color = ui.log[#ui.log-i+1].color
+   for i = 1,#state.log do
+      local txt = state.log[#state.log-i+1].str
+      local color = state.log[#state.log-i+1].color
       y = y + 16
       painter:moveto(x,y)
       painter:setcolor(color)
