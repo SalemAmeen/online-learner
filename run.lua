@@ -126,10 +126,12 @@ options.t_flow_uthreshold = 100
 options.classes = {'Object 1','Object 2','Object 3',
                    'Object 4','Object 5','Object 6'}
 
+
+print('e-Lab Online Learner')
+print('Initializing...\n')
+
 -- profiler
 profiler = xlua.Profiler()
-
-
 
 -- load required submodules
 state = require 'state'
@@ -162,4 +164,6 @@ sys.execute('mkdir -p scratch')
 
 
 -- start execution
+print('Initialization finished')
+print('Processing...\n')
 state.begin()

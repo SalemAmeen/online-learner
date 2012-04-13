@@ -7,7 +7,6 @@ local boxh = options.boxh
 local boxw = options.boxw
 
 -- encoder
-print('e-Lab Online Learner')
 print('loading encoder:')
 encoder = torch.load(options.encoder)
 encoder:float()
@@ -23,11 +22,12 @@ maxpooler = nn.SpatialMaxPooling(pw,ph,1,1)
 encoderm:add(maxpooler)
 print(' ... appending a ' .. pw .. 'x' .. ph .. ' max-pooling module')
 print(' ... input window of convnet is ' .. encoder.modules[1].gradInput:size(1) .. 'x' .. encoder.modules[1].gradInput:size(2) .. 'x' .. encoder.modules[1].gradInput:size(3) .. ' in size')
+print(' ... image downsampling ratio = ' .. downs)
 encoder_dw = 1
 for i,mod in ipairs(encoderm.modules) do
    if mod.dW then encoder_dw = encoder_dw * mod.dW end
 end
-print(' ... global downsampling ratio = ' .. encoder_dw)
+print(' ... encoder global downsampling ratio = ' .. encoder_dw)
 print('')
 
 -- create other encoders for online learning and full scene encoding
