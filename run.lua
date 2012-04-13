@@ -29,8 +29,6 @@
 
 require 'xlua'
 require 'nnx'
-require 'imgraph'
-require 'opencv'
 require 'openmp'
 
 -- do everything in single precision

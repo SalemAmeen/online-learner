@@ -190,5 +190,6 @@ if not tracker then
           'invalid tracking algorithm ' .. options.tracker)
    return tracknone 
 else
+   require 'opencv'
    return trackall
 end

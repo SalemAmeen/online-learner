@@ -1,3 +1,5 @@
+require 'imgraph'
+
 -- C coroutines
 local c = require 'coroutines'
 
