@@ -47,8 +47,12 @@ if options.source ~= 'dataset' then
    options.boxh = options.box
    options.boxw = options.box
 else 
-   --ignore downsampling, set so that width and height are at least 64px
-   options.downs = math.min(options.boxh, options.boxw)/64
+   local minhw = math.min(options.boxh, options.boxw)
+   if minhw < 46 then
+      --ignore options.downs, set so that width and height are at least 46px
+      print('Dataset box size too small, overriding downsampling option\n')
+      options.downs = minhw/46
+   end
    state.learn = {x=(source.gt.lx+source.gt.rx)/2, 
                  y=(source.gt.ty+source.gt.by)/2,
                  id=1, class=state.classes[1]}
