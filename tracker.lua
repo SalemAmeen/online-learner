@@ -47,6 +47,9 @@ local function simpletracker(result)
    -- new width and height
    nresult.change_x = stdn_x / std_x
    nresult.change_y = stdn_y / std_y
+   -- check for nan
+   if nresult.change_x ~= nresult.change_x then nresult.change_x = 1 end
+   if nresult.change_y ~= nresult.change_y then nresult.change_y = 1 end
    nresult.w = result.w * nresult.change_x
    nresult.h = result.h * nresult.change_y
    -- new top, left position
