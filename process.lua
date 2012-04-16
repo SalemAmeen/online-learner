@@ -82,6 +82,7 @@ local function process()
    end
    -- get max (winning category)
    _, state.winners = torch.max(state.distributions,1)
+   state.maxProb = torch.max(state.distributions:narrow(1,1,#state.classes))
    state.winners = state.winners[1]
    -- get connected components
    local graph = imgraph.graph(state.winners:type('torch.FloatTensor'), 4)
