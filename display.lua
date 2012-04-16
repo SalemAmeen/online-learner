@@ -150,6 +150,8 @@ function display.update()
 
       -- update threshold
       state.threshold = widget.verticalSlider.value / 1000
+      widget.lcdNumber.value = state.threshold
+      widget.progressBar.value = state.maxProb * 1000
    end
    ui.proc()
    profiler:lap('display')
