@@ -9,6 +9,7 @@ local boxh = options.boxh
 local boxw = options.boxw
 
 -- encoder
+print('e-Lab Online Learner')
 print('loading encoder:')
 encoder = torch.load(options.encoder)
 encoder:float()
@@ -88,8 +89,28 @@ local function process()
    local graph = imgraph.graph(state.winners:type('torch.FloatTensor'), 4)
    local components = imgraph.connectcomponents(graph, 0.5)
    -- find bounding boxes of blobs
-   state.blobs = c.getblobs(components, state.winners, #state.classes+1)
-   --
+   if options.tracksingle then
+      state.blobs = {}
+      -- assign each class a bounding box based on its peak probability
+      local maxpos=torch.LongTensor(#state.classes,2)
+      for id = 1,#state.classes do
+         local prow,yrow = torch.max(state.distributions[id],1)
+         local p,x = torch.max(prow,2)
+         local p=p[1][1]
+         if p >= state.threshold then
+            -- make sure another class isn't winner here
+            local x=x[1][1]
+            local y=yrow[1][x]
+            -- this may fail with multiple object classes
+            assert(id == state.winners[y][x])
+            local blob = c.getblob(components,x,y)
+            blob[5] = id
+            table.insert(state.blobs,blob)
+         end
+      end
+   else
+      state.blobs = c.getblobs(components, state.winners, #state.classes+1)
+   end
    profiler:lap('estimate-distributions')
 
    ------------------------------------------------------------
@@ -118,6 +139,9 @@ local function process()
          -- make sure it doesnt already exist from the tracker:
          local exists = false
          for _,res in ipairs(state.results) do
+            if options.tracksingle and id == res.id then
+               exists = true
+            end
             if (lx+boxw) > res.lx and lx < (res.lx+res.w) and (ty+boxh) > res.ty and ty < (res.ty+res.h) then
                -- clears this object from recognition
                exists = true
@@ -202,6 +226,20 @@ local function process()
       -- done
       state.learn = nil
       profiler:lap('learn-new-view')
+   end
+
+   ------------------------------------------------------------
+   -- (7) save results
+   ------------------------------------------------------------
+   if state.dsoutfile then
+      local res = state.results[1]
+      if res then
+         state.dsoutfile:writeString(res.lx .. ',' .. res.ty .. ',' ..
+                                     res.lx+res.w .. ',' .. res.ty+res.h)
+      else
+         state.dsoutfile:writeString('NaN,NaN,NaN,Nan')
+      end
+      state.dsoutfile:writeString('\n')
    end
 end
 

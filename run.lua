@@ -70,6 +70,9 @@ op:option{'-n', '--dsencoding', action='store', dest='dsencoding',
           help='dataset image format',
           default='jpg'}
 
+op:option{'-O', '--dsoutput', action='store', dest='dsoutput',
+          help='file to save tracker output to, for dataset only'}
+
 op:option{'-N', '--nogui', action='store_true', dest='nogui',
           help='turn off the GUI display (only useful with dataset)'}
 
@@ -95,6 +98,9 @@ op:option{'-T', '--tracker', action='store', dest='tracker',
 
 op:option{'-A', '--autolearn', action='store_true', dest='autolearn',
           help='turn on autolearning'}
+
+op:option{'-S', '--tracksingle', action='store_true', dest='tracksingle',
+          help='track only one object for each class'}
 
 op:option{'-d', '--downsampling', action='store', dest='downs',
           help='downsampling for recognition/processing',
@@ -130,6 +136,7 @@ print('Initializing...\n')
 
 -- profiler
 profiler = xlua.Profiler()
+
 
 -- load required submodules
 state = require 'state'
