@@ -86,17 +86,24 @@ local function process()
    local components = imgraph.connectcomponents(graph, 0.5)
    -- find bounding boxes of blobs
    if options.tracksingle then
-      -- might not work for multiple object classes, just a stand-in anyway
+      state.blobs = {}
+      -- assign each class a bounding box based on its peak probability
       local maxpos=torch.LongTensor(#state.classes,2)
       for id = 1,#state.classes do
          local prow,yrow = torch.max(state.distributions[id],1)
          local p,x = torch.max(prow,2)
-         local x=x[1][1]
-         local y=yrow[1][x]
-         maxpos[id][1] = x
-         maxpos[id][2] = y
+         local p=p[1][1]
+         if p >= state.threshold then
+            -- make sure another class isn't winner here
+            local x=x[1][1]
+            local y=yrow[1][x]
+            -- this may fail with multiple object classes
+            assert(id == state.winners[y][x])
+            local blob = c.getblob(components,x,y)
+            blob[5] = id
+            table.insert(state.blobs,blob)
+         end
       end
-      state.blobs = c.getblobs(components, state.winners, maxpos, #state.classes+1)
    else
       state.blobs = c.getblobs(components, state.winners, #state.classes+1)
    end
