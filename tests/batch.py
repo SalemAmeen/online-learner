@@ -26,7 +26,7 @@ def main(cfgfile, runlabel, ldir=LEARNERDIR, mldir=MATLABDIR, dsdir=TLDDIR,
     config.read(cfgfile)
     datasets = config.get('batch','datasets').split(',')
     runopts = config.items('op')
-    runcmd = ['torch','run.lua','--nogui','--source=dataset']
+    runcmd = ['torch','run.lua','--nogui','--source=dataset','--tracksingle']
     for opt,val in runopts:
         try:
             val = config.getboolean('op',opt)
