@@ -1,6 +1,6 @@
 import sys
 import os
-from os.path import join, abspath
+from os.path import join, realpath, dirname
 from subprocess import Popen, STDOUT
 import ConfigParser
 from math import sqrt
@@ -9,17 +9,14 @@ from joblib import Parallel, delayed
 
 from run import run
 
-TLDDIR=join('..','TLD')
-RESULTSDIR=join('..','results')
-LEARNERDIR='..'
-MATLABDIR='matlab'
+SCRIPTDIR=dirname(realpath(__file__))
+LEARNERDIR=dirname(SCRIPTDIR)
+TLDDIR=join(LEARNERDIR,'TLD')
+RESULTSDIR=join(LEARNERDIR,'results')
+MATLABDIR=join(SCRIPTDIR,'matlab')
 
 def main(cfgfile, runlabel, ldir=LEARNERDIR, mldir=MATLABDIR, dsdir=TLDDIR,
          resdir=RESULTSDIR):
-    ldir=abspath(ldir)
-    mldir=abspath(mldir)
-    dsdir=abspath(dsdir)
-    resdir=abspath(resdir)
     outpath = join(resdir,runlabel)
     os.mkdir(outpath)
     config = ConfigParser.ConfigParser()
