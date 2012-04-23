@@ -66,7 +66,7 @@ local function fbtracker(result)
    -- track points
    --
    -- put tracking points on grid, every Npx pixels
-   local Npx = 9
+   local Npx = 5
    local xpoints = torch.floor(torch.linspace(result.lx-1,result.lx-1+result.w, math.floor(result.w/Npx)))
    local xn = xpoints:size(1)
    local ypoints = torch.floor(torch.linspace(result.ty-1,result.ty-1+result.h, math.floor(result.h/Npx)))
