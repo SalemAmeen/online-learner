@@ -160,21 +160,27 @@ local function trackall()
 
       -- if result still in the fov, and didnt change too much, then keep it !
       if not nresult then
-         print('dropping tracked result: no tracking points returns\n')
+         print('dropping tracked result: no tracking points returned')
       elseif nresult.ty < 1 or (nresult.ty+nresult.h-1) > state.yuvFrame:size(2)
           or nresult.lx < 1 or (nresult.lx+nresult.w-1) > state.yuvFrame:size(3)
-          or nresult.change_x >= options.t_sizechange_uthreshold
+      then
+         print('dropping tracked result: out of frame boundary')
+         print('lx = ' .. nresult.lx)
+         print('ty = ' .. nresult.ty)
+      elseif nresult.change_x >= options.t_sizechange_uthreshold
           or nresult.change_x <= options.t_sizechange_lthreshold
           or nresult.change_y >= options.t_sizechange_uthreshold
           or nresult.change_y <= options.t_sizechange_lthreshold
-          or nresult.flow_x >= options.t_flow_uthreshold
-          or nresult.flow_y >= options.t_flow_uthreshold then
-         print('dropping tracked result:')
+      then
+         print('dropping tracked result: size change over threshold')
          print('change_x = ' .. nresult.change_x)
          print('change_y = ' .. nresult.change_y)
+      elseif nresult.flow_x >= options.t_flow_uthreshold
+          or nresult.flow_y >= options.t_flow_uthreshold
+      then
+         print('dropping tracked result: flow over threshold')
          print('flow_x = ' .. nresult.flow_x)
          print('flow_y = ' .. nresult.flow_y)
-         print('')
       else
          nresult.source = 1
          table.insert(state.results, nresult)
