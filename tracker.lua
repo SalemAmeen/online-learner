@@ -129,6 +129,9 @@ local function fbtracker(result)
    dratio, _ = torch.sort(dratio,1)
    nresult.change_x = dratio[math.ceil(dratio:size(1)/2)][1]
    nresult.change_y = dratio[math.ceil(dratio:size(1)/2)][2]
+   -- check for nan
+   if nresult.change_x ~= nresult.change_x then nresult.change_x = 1 end
+   if nresult.change_y ~= nresult.change_y then nresult.change_y = 1 end
 
    -- new width and height
    nresult.w = result.w * nresult.change_x
