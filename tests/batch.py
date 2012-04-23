@@ -28,11 +28,11 @@ def main(cfgfile, runlabel, ldir=LEARNERDIR, mldir=MATLABDIR, dsdir=TLDDIR,
     runopts = config.items('op')
     runcmd = ['torch','run.lua','--nogui','--tracksingle','--source=dataset']
     for opt,val in runopts:
-        try:
-            val = config.getboolean('op',opt)
-            if val:
-                runcmd.append('--%s' % opt)
-        except ValueError:
+        if val.strip().lower() in ['true', 'yes', 'on']:
+            runcmd.append('--%s' % opt)
+        elif val.strip().lower() in ['false', 'no', 'off']:
+            continue
+        else:
             runcmd.append('--%s=%s' % (opt,val))
 
     jobs = (delayed(run)(ldir,runcmd,dsdir,outpath,ds) for ds in datasets)
