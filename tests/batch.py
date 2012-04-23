@@ -38,14 +38,20 @@ def main(cfgfile, runlabel, ldir=LEARNERDIR, mldir=MATLABDIR, dsdir=TLDDIR,
     jobs = (delayed(run)(ldir,runcmd,dsdir,outpath,ds) for ds in datasets)
     Parallel(n_jobs=-1, verbose=5)(jobs)
 
-    batchlog = open(join(outpath,'batch.log'),'w')
+    compute_results(mldir, datasets, outpath, runlabel)
+
+def compute_results(mldir, datasets, outpath, runlabel):
     mlcmdstr = ("Sequence = {'" + "','".join(datasets) + "'};" + \
                ("InputPath = '%s';" % outpath) + \
                ("Tracker = {'%s'};" % runlabel) + \
                "compute_results;"
                "exit;")
     mlcmd=['matlab','-nodesktop','-nosplash','-r',mlcmdstr]
-    child=Popen(mlcmd,cwd=mldir,stdout=batchlog,stderr=STDOUT)
+    with open(join(outpath,'batch.log'),'w') as batchlog:
+        child=Popen(mlcmd,cwd=mldir,stdout=batchlog,stderr=STDOUT)
+    child.wait()
+    child=Popen(['stty','sane'])
+    child.wait()
 
 cfgfile = sys.argv[1]
 runlabel = sys.argv[-1]
