@@ -67,15 +67,13 @@ local function fbtracker(result)
    --
    -- put tracking points on grid, every Npx pixels
    local Npx = 5
+   if math.min(result.w, result.h) < 2*Npx then return end
    local xpoints = torch.floor(torch.linspace(result.lx-1,result.lx-1+result.w, math.floor(result.w/Npx)))
    local xn = xpoints:size(1)
    local ypoints = torch.floor(torch.linspace(result.ty-1,result.ty-1+result.h, math.floor(result.h/Npx)))
    local yn = ypoints:size(1)
    local allnbpoints = xn * yn
    local nbpoints = math.floor(allnbpoints/2)
-   if nbpoints < 2 then
-      return
-   end
    local allTrackPointsP = torch.Tensor(allnbpoints,2)
    for i = 1,xn do
        local xy = allTrackPointsP:narrow(1,1+yn*(i-1),yn)
