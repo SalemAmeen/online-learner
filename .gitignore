@@ -1,3 +1,8 @@
-scratch
 .DS_Store
 *.pyc
+*.sw?
+
+scratch/
+
+TLD/
+results/
