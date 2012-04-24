@@ -20,7 +20,7 @@ def main(cfgfile, runlabel, ldir=LEARNERDIR, mldir=MATLABDIR, dsdir=TLDDIR,
     outpath = join(resdir,runlabel)
     try:
         os.mkdir(outpath)
-    catch OSError:
+    except OSError:
         pass
     config = ConfigParser.ConfigParser()
     config.read(cfgfile)
