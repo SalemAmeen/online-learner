@@ -66,16 +66,14 @@ local function fbtracker(result)
    -- track points
    --
    -- put tracking points on grid, every Npx pixels
-   local Npx = 9
+   local Npx = 5
+   if math.min(result.w, result.h) < 2*Npx then return end
    local xpoints = torch.floor(torch.linspace(result.lx-1,result.lx-1+result.w, math.floor(result.w/Npx)))
    local xn = xpoints:size(1)
    local ypoints = torch.floor(torch.linspace(result.ty-1,result.ty-1+result.h, math.floor(result.h/Npx)))
    local yn = ypoints:size(1)
    local allnbpoints = xn * yn
    local nbpoints = math.floor(allnbpoints/2)
-   if nbpoints < 2 then
-      return
-   end
    local allTrackPointsP = torch.Tensor(allnbpoints,2)
    for i = 1,xn do
        local xy = allTrackPointsP:narrow(1,1+yn*(i-1),yn)
@@ -131,6 +129,9 @@ local function fbtracker(result)
    dratio, _ = torch.sort(dratio,1)
    nresult.change_x = dratio[math.ceil(dratio:size(1)/2)][1]
    nresult.change_y = dratio[math.ceil(dratio:size(1)/2)][2]
+   -- check for nan
+   if nresult.change_x ~= nresult.change_x then nresult.change_x = 1 end
+   if nresult.change_y ~= nresult.change_y then nresult.change_y = 1 end
 
    -- new width and height
    nresult.w = result.w * nresult.change_x
@@ -159,21 +160,27 @@ local function trackall()
 
       -- if result still in the fov, and didnt change too much, then keep it !
       if not nresult then
-         print('dropping tracked result: no tracking points returns\n')
+         print('dropping tracked result: no tracking points returned')
       elseif nresult.ty < 1 or (nresult.ty+nresult.h-1) > state.yuvFrame:size(2)
           or nresult.lx < 1 or (nresult.lx+nresult.w-1) > state.yuvFrame:size(3)
-          or nresult.change_x >= options.t_sizechange_uthreshold
+      then
+         print('dropping tracked result: out of frame boundary')
+         print('lx = ' .. nresult.lx)
+         print('ty = ' .. nresult.ty)
+      elseif nresult.change_x >= options.t_sizechange_uthreshold
           or nresult.change_x <= options.t_sizechange_lthreshold
           or nresult.change_y >= options.t_sizechange_uthreshold
           or nresult.change_y <= options.t_sizechange_lthreshold
-          or nresult.flow_x >= options.t_flow_uthreshold
-          or nresult.flow_y >= options.t_flow_uthreshold then
-         print('dropping tracked result:')
+      then
+         print('dropping tracked result: size change over threshold')
          print('change_x = ' .. nresult.change_x)
          print('change_y = ' .. nresult.change_y)
+      elseif nresult.flow_x >= options.t_flow_uthreshold
+          or nresult.flow_y >= options.t_flow_uthreshold
+      then
+         print('dropping tracked result: flow over threshold')
          print('flow_x = ' .. nresult.flow_x)
          print('flow_y = ' .. nresult.flow_y)
-         print('')
       else
          nresult.source = 1
          table.insert(state.results, nresult)

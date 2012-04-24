@@ -163,8 +163,8 @@ local function process()
    if state.autolearn then
       for _,res in ipairs(state.results) do
          -- get center prediction
-         local cx = (res.cx-off_x-1)/downs/encoder_dw+1
-         local cy = (res.cy-off_y-1)/downs/encoder_dw+1
+         local cx = math.min(math.max(res.cx-off_x-1,1)/downs/encoder_dw+1,state.yuvFrame:size(3))
+         local cy = math.min(math.max(res.cy-off_y-1,1)/downs/encoder_dw+1,state.yuvFrame:size(2))
          local recog = state.distributions[res.id][cy][cx]
          if recog < (state.threshold*0.9) then
             -- auto learn

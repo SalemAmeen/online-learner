@@ -49,7 +49,9 @@ if options.nogui then
    function state.begin()
       while not state.finished do
          profiler:start('full-loop','fps')
+         print('Frame:',source.current)
          process()
+         print('')
          profiler:lap('full-loop')
       end
       state.finish()
