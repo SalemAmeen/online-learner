@@ -18,7 +18,10 @@ MATLABDIR=join(SCRIPTDIR,'matlab')
 def main(cfgfile, runlabel, ldir=LEARNERDIR, mldir=MATLABDIR, dsdir=TLDDIR,
          resdir=RESULTSDIR):
     outpath = join(resdir,runlabel)
-    os.mkdir(outpath)
+    try:
+        os.mkdir(outpath)
+    catch OSError:
+        pass
     config = ConfigParser.ConfigParser()
     config.read(cfgfile)
     datasets = config.get('batch','datasets').split(',')
