@@ -103,7 +103,7 @@ op:option{'-S', '--tracksingle', action='store_true', dest='tracksingle',
           help='track only one object for each class'}
 
 op:option{'-d', '--downsampling', action='store', dest='downs',
-          help='downsampling for recognition/processing',
+          help='image downsampling ratio (-1 to downsample as much as possible)',
           default=2}
 
 op:option{'-t', '--target', action='store', dest='target',

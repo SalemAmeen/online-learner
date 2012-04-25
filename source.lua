@@ -47,12 +47,6 @@ if options.source ~= 'dataset' then
    options.boxh = options.box
    options.boxw = options.box
 else 
-   local minhw = math.min(options.boxh, options.boxw)
-   if minhw < 46 then
-      --ignore options.downs, set so that width and height are at least 46px
-      print('Dataset box size too small, overriding downsampling option\n')
-      options.downs = minhw/46
-   end
    state.learn = {x=(source.gt.lx+source.gt.rx)/2, 
                  y=(source.gt.ty+source.gt.by)/2,
                  id=1, class=state.classes[1]}
@@ -69,10 +63,13 @@ if options.source == 'dataset' or options.source == 'video' then
    source.forward = finishwrap
 end
 
-local rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
--- originally owidth and oheight had +3, not sure why, removed for now
-local rescaler = nn.SpatialReSampling{owidth=options.width/options.downs,
-                                   oheight=options.height/options.downs}
+source.rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
+function source.setdowns(downs)
+   -- originally owidth and oheight had +3, not sure why, removed for now
+   source.rescaler = nn.SpatialReSampling{owidth=options.width/downs,
+                                      oheight=options.height/downs}
+end
+source.setdowns(options.downs)
 
 function source:getframe()
    -- store previous frame
@@ -86,8 +83,8 @@ function source:getframe()
    state.rawFrame:add(-state.rawFrame:min()):div(math.max(state.rawFrame:max(),1e-6))
 
    -- convert and rescale
-   state.yuvFrame = rgb2yuv:forward(state.rawFrame)
-   state.procFrame = rescaler:forward(state.yuvFrame)
+   state.yuvFrame = source.rgb2yuv:forward(state.rawFrame)
+   state.procFrame = source.rescaler:forward(state.yuvFrame)
 end
 
 return source

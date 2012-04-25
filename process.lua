@@ -15,6 +15,20 @@ encoder = torch.load(options.encoder)
 encoder:float()
 xprint(encoder.modules)
 print('')
+local mind_enc = encoder.modules[1].gradInput:size(1)
+local minh_enc = encoder.modules[1].gradInput:size(2)
+local minw_enc = encoder.modules[1].gradInput:size(3)
+print(' ... input window of convnet is ' .. mind_enc .. 'x' .. minh_enc .. 'x' .. minw_enc .. ' in size')
+if downs*1 == -1 then
+   options.downs = math.min(boxh/minh_enc,boxw/minw_enc)
+   downs = options.downs
+   source.setdowns(downs)
+   print('... setting downsampling to maximum of ' .. downs)
+else
+   print(type(options.box))
+   print(type(options.downs))
+   print(' ... image downsampling ratio = ' .. downs)
+end
 print('calibrating encoder so as to produce a single vector for a training patch of width ' .. boxw/downs .. ' and height ' .. boxh/downs .. '...')
 local t = torch.Tensor(3,boxh/downs,boxw/downs)
 local res = encoder:forward(t)
@@ -24,8 +38,6 @@ encoderm = encoder:clone()
 maxpooler = nn.SpatialMaxPooling(pw,ph,1,1)
 encoderm:add(maxpooler)
 print(' ... appending a ' .. pw .. 'x' .. ph .. ' max-pooling module')
-print(' ... input window of convnet is ' .. encoder.modules[1].gradInput:size(1) .. 'x' .. encoder.modules[1].gradInput:size(2) .. 'x' .. encoder.modules[1].gradInput:size(3) .. ' in size')
-print(' ... image downsampling ratio = ' .. downs)
 encoder_dw = 1
 for i,mod in ipairs(encoderm.modules) do
    if mod.dW then encoder_dw = encoder_dw * mod.dW end
