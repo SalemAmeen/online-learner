@@ -197,7 +197,7 @@ c.getblob = inline.load [[
                } else if(x > rx) {
                   rx = x;
                }
-               if(y > by) ty = y;
+               if(y > by) by = y;
             }
          }
          if(!valinrow) break;
