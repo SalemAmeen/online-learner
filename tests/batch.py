@@ -28,9 +28,9 @@ def main(cfgfile, runlabel, ldir=LEARNERDIR, mldir=MATLABDIR, dsdir=TLDDIR,
     runopts = config.items('op')
     runcmd = ['torch','run.lua','--nogui','--tracksingle','--source=dataset']
     for opt,val in runopts:
-        if val.strip().lower() in ['true', 'yes', 'on']:
+        if val.strip().lower() in ['true']:
             runcmd.append('--%s' % opt)
-        elif val.strip().lower() in ['false', 'no', 'off']:
+        elif val.strip().lower() in ['false']:
             continue
         else:
             runcmd.append('--%s=%s' % (opt,val))
