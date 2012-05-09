@@ -2,7 +2,7 @@
 *.pyc
 *.sw?
 
-scratch/
-.smt/
-TLD/
-results/
+/scratch
+/.smt
+/TLD
+/results
