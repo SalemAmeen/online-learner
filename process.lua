@@ -45,6 +45,11 @@ end
 print(' ... encoder global downsampling ratio = ' .. encoder_dw)
 print('')
 
+
+--A.W
+decideMsg(options)
+
+
 -- create other encoders for online learning and full scene encoding
 encoder_full = encoderm:clone()
 encoder_patch = encoderm:clone()
@@ -62,6 +67,12 @@ local function process()
    profiler:start('get-frame')
    source:getframe()
    profiler:lap('get-frame')
+
+	--A.W.--this is calculated every loop and shouldn't be?
+	local raw_dim = state.rawFrame:size()
+	local raw_d = raw_dim[1]
+	local raw_h = raw_dim[2]
+	local raw_w = raw_dim[3]
 
    ------------------------------------------------------------
    -- (1) track objects
@@ -201,44 +212,64 @@ local function process()
             table.insert(state.memory[res.id], {patch=patch, code=code})
          end
       end
-   end
+	end
    profiler:lap('auto-learn')
 
    ------------------------------------------------------------
    -- (6) capture new prototype, upon user request
    ------------------------------------------------------------
    if state.learn then
-      profiler:start('learn-new-view')
-      -- compute x,y coordinates
-      local lx = math.min(math.max(state.learn.x-boxw/2,0),state.yuvFrame:size(3)-boxw)
-      local ty = math.min(math.max(state.learn.y-boxh/2,0),state.yuvFrame:size(2)-boxh)
-      state.logit('adding [' .. state.learn.class .. '] at ' .. lx 
+		--A.W.
+		if isDeciding(options) then
+			--either calibrates a z_screen or
+			--predicts and angle based on a calibrated z value
+			decideDist(options, state.learn.x, state.learn.y, raw_w)
+		else
+			print("ADDING STUFF")
+			profiler:start('learn-new-view')
+      	-- compute x,y coordinates
+     		local lx = math.min(math.max(state.learn.x-boxw/2,0),state.yuvFrame:size(3)-boxw)
+     		local ty = math.min(math.max(state.learn.y-boxh/2,0),state.yuvFrame:size(2)-boxh)
+      	state.logit('adding [' .. state.learn.class .. '] at ' .. lx 
                   .. ',' .. ty, state.learn.id)
 
-      -- and create a result !!
-      local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, 
+			-- and create a result !!
+      	local nresult = {lx=lx, ty=ty, cx=lx+boxw/2, cy=ty+boxh/2, w=boxw, 
                        h=boxh, class=state.classes[state.learn.id], 
                        id=state.learn.id, source=6}
-      table.insert(state.results, nresult)
+      	table.insert(state.results, nresult)
 
-      -- remap to smaller proc map
-      lx = lx / downs + 1
-      ty = ty / downs + 1
+      	-- remap to smaller proc map
+      	lx = lx / downs + 1
+      	ty = ty / downs + 1
 
-      -- extract patch at that location
-      local patch = state.procFrame:narrow(3,lx,boxw/downs):narrow(2,ty,boxh/downs):clone()
+      	-- extract patch at that location
+      	local patch = state.procFrame:narrow(3,lx,boxw/downs):narrow(2,ty,boxh/downs):clone()
 
-      -- compute code for patch
-      local code = encoder_patch:forward(patch):clone()
+      	-- compute code for patch
+      	local code = encoder_patch:forward(patch):clone()
 
-      -- store patch and its code
-      state.memory[state.learn.id] = state.memory[state.learn.id] or {}
-      table.insert(state.memory[state.learn.id], {patch=patch, code=code})
-
-      -- done
-      state.learn = nil
-      profiler:lap('learn-new-view')
+      	-- store patch and its code
+      	state.memory[state.learn.id] = state.memory[state.learn.id] or {}
+      	table.insert(state.memory[state.learn.id], {patch=patch, code=code})
+			
+			-- done
+      	state.learn = nil
+			learnedFlag = true
+     		profiler:lap('learn-new-view')
+		end
+ 		
+      
    end
+	------------------------------------------------------------
+	-- (?) findfollow object
+   ------------------------------------------------------------
+	--A.W & Y.L.
+	if options.findfollow and learnedFlag then
+      if state.results[1] then
+			printMedian(options, state.results[1].cx , state.results[1].cy, raw_w)
+      end
+	end
 
    ------------------------------------------------------------
    -- (7) save results

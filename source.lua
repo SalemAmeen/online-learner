@@ -2,7 +2,8 @@ local source = {}
 -- camera source, rescaler, color space
 if options.source == 'camera' then
    require 'camera'
-   source = image.Camera{}
+   --EDITED THE FOLLOWING LINE
+   source = image.Camera{idx=options.camidx}
 elseif options.source == 'video' then
    require 'ffmpeg'
    source = ffmpeg.Video{path=options.video, width=options.width,

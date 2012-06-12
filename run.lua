@@ -114,6 +114,18 @@ op:option{'-f', '--file', action='store', dest='file',
           help='file to sync memory to',
           default='memory'}
 
+--OPTION ADDED BY A.W. to help calibrate angle calculations for centering
+op:option{'-R', '--ratiocalib', action='store', dest='rcalib',
+          help='ratio(X/Z or perp. dist/para. dist.) at which centering params are calibrated',
+          default=0}
+--OPTION ADDED BY A.W. to help calibrate angle calculations for centering
+op:option{'-z', '--zscreen', action='store', dest='zscreen',
+          help='z_screen value output by the calibration, to be used to estimate angles',
+          default=0}
+op:option{'-F', '--findfollow', action='store_true', dest='findfollow',
+          help='turn and move towards tracked object',
+          default=false}
+
 options,args = op:parse()
 
 -- options which are not in the command line yet
@@ -137,6 +149,12 @@ print('Initializing...\n')
 -- profiler
 profiler = xlua.Profiler()
 
+
+--A.W.
+bot = require 'bot'
+calib = require 'calib'
+findf = require 'findf'
+learnedFlag = false
 
 -- load required submodules
 state = require 'state'
