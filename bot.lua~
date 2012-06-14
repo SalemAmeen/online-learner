@@ -111,6 +111,8 @@ function get_distance(kinect_value)
 	local count = 0;
 	if kinect_value < thres[1] then
 		return 0.5
+	elseif kinect_value > 0.95 then
+		return 1
 	end
 	--checks where the distance value is in relation to the thresholds
    for i=1,numThresh-1 do

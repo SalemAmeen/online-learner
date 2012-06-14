@@ -47,7 +47,8 @@ print('')
 
 
 --A.W
-decideMsg(options)
+--NOTE: decideMsg is in 'calib.lua'
+if calib then decideMsg(options) end
 
 
 -- create other encoders for online learning and full scene encoding
@@ -220,7 +221,8 @@ local function process()
    ------------------------------------------------------------
    if state.learn then
 		--A.W.
-		if isDeciding(options) then
+		--NOTE: isDeciding, decideDist are in 'calib.lua'
+		if calib then
 			--either calibrates a z_screen or
 			--predicts and angle based on a calibrated z value
 			decideDist(options, state.learn.x, state.learn.y, raw_w)
@@ -266,9 +268,20 @@ local function process()
    ------------------------------------------------------------
 	--A.W & Y.L.
 	if options.findfollow and learnedFlag then
+		local ang = 0
+		--NOTE: findMedian is in 'findf.lua'
       if state.results[1] then
-			printMedian(options, state.results[1].cx , state.results[1].cy, raw_w)
+			ang = findMedian(options, state.results[1].cx , state.results[1].cy, raw_w)
+      else
+			ang = findMedian(options, -1, -1, raw_w)
       end
+
+		if ang then
+			turn_bot(ang)
+			move_straight()
+		end
+		
+
 	end
 
    ------------------------------------------------------------

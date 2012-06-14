@@ -151,9 +151,13 @@ profiler = xlua.Profiler()
 
 
 --A.W.
-bot = require 'bot'
-calib = require 'calib'
-findf = require 'findf'
+if options.rcalib ~=0 or options.zscreen ~=0 then
+	calib = require 'calib'
+	bot = require 'bot'
+elseif options.findfollow then
+	findf = require 'findf'
+	bot = require 'bot'
+end
 learnedFlag = false
 
 -- load required submodules
