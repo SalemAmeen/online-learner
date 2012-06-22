@@ -1,6 +1,9 @@
 local source = {}
 -- camera source, rescaler, color space
 if options.source == 'camera' then
+	if options.camidx~=0 then
+		useOpenCV=true -- force linux to use OpenCV if it is not the built-in camera
+	end
    require 'camera'
    --EDITED THE FOLLOWING LINE
    source = image.Camera{idx=options.camidx}
@@ -42,6 +45,10 @@ elseif options.source == 'dataset' then
       return oldforward(self)
    end
    source.forward = gtwrap
+
+elseif options.source == 'kinect' then
+	require 'kinect'
+	kinect.initDevice()
 end
 
 if options.source ~= 'dataset' then
@@ -67,7 +74,7 @@ end
 source.rgb2yuv = nn.SpatialColorTransform('rgb2yuv')
 function source.setdowns(downs)
    -- originally owidth and oheight had +3, not sure why, removed for now
-   source.rescaler = nn.SpatialReSampling{owidth=options.width/downs,
+  source.rescaler = nn.SpatialReSampling{owidth=options.width/downs,
                                       oheight=options.height/downs}
 end
 source.setdowns(options.downs)
@@ -75,9 +82,15 @@ source.setdowns(options.downs)
 function source:getframe()
    -- store previous frame
    if state.rawFrame then state.rawFrameP:resizeAs(state.rawFrame):copy(state.rawFrame) end
-
-   -- capture next frame
-   state.rawFrame = self:forward()
+	
+	-- capture next frame
+	if options.source == 'kinect' then
+		local RGBD_frame = kinect.getRGBD()
+		state.rawFrame = RGBD_frame:narrow(1,1,3)
+		source.depthFrame = RGBD_frame:narrow(1,4,1)
+	else
+		state.rawFrame = self:forward()
+	end
    state.rawFrame = state.rawFrame:float()
 
    -- global linear normalization of input frame
@@ -86,7 +99,6 @@ function source:getframe()
    -- convert and rescale
    state.yuvFrame = source.rgb2yuv:forward(state.rawFrame)
    state.procFrame = source.rescaler:forward(state.yuvFrame)
-	print('s',state.procFrame:size())
 end
 
 return source

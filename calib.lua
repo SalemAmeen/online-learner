@@ -1,4 +1,6 @@
-function decideMsg(_options)
+local calib = {}
+
+function calib.decideMsg(_options)
 	if _options.rcalib ~= 0 then
 		printCalibMsg(_options)
 	elseif _options.zscreen ~= 0 then
@@ -7,7 +9,7 @@ function decideMsg(_options)
 end
 
 
-local function printCalibMsg(_opt)
+function printCalibMsg(_opt)
 
 	print('\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
 	print('Entered into angle calibration mode, for centering\n')
@@ -16,22 +18,14 @@ local function printCalibMsg(_opt)
 	print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 end
 
-local function printAngleMsg()
+function printAngleMsg()
 
 	print('\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
 	print('Entered into angle estimation mode, for centering\n')
-	print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
+	print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++cx+\n')
 end
 
-function isDeciding(_options)
-	if (_options.rcalib==0)and(_options.zscreen==0) then
-		return false;
-	else
-		return true;
-	end	
-end
-
-function decideDist(_options, _x, _y, _screenW)
+function calib.decideDist(_options, _x, _y, _screenW)
 		if _options.rcalib ~= 0 then
 						
 			--If we're calibrating, we want to calculate 
@@ -56,7 +50,7 @@ function decideDist(_options, _x, _y, _screenW)
 			----------------------------------------------------------------------
 			local cx = _x; local cy = _y;
                         
-				local dx=final_x-_screenW/2
+				local dx=cx-_screenW/2
 				--local dy=cy-raw_h/2 -- this isn't needed yet
 				--the robot can only turn left and right, no tilt
 
@@ -79,4 +73,4 @@ function decideDist(_options, _x, _y, _screenW)
 		end
 end
 
-
+return calib

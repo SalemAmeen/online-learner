@@ -1,14 +1,19 @@
 --Written by Adam Willats and Yu Chen Lim
-
-
-require 'kinect'
--- Initialize the Kinect
-kinect.initDevice()
+local bot = {}
 
 -- Robot mover program
-local path = "~/ros_workspace/robot_mover/bin/robot_mover "
+local path = "~/ros_workspace/robot_mover/bin/basic_mover "
+local path_smooth = "~/ros_workspace/robot_mover/bin/smooth_mover "
 -- Needed by the robot mover
 local command_path = 'export ROS_MASTER_URI=http://10.42.43.30:11311;'
+os.execute(command_path.."~/ros_workspace/turtlebot_init/bin/turtlebot_init")
+os.execute("sleep 3")
+
+if options.source ~= 'kinect' then
+	require 'kinect'
+	-- Initialize the Kinect
+	kinect.initDevice()
+end
 
 --Movement constants
 local min_obj_dist = .7 --(in meters) the minimum distance 
@@ -18,12 +23,13 @@ local max_obj_dist = .6 -- (in meters)
 
 
 local min_move_dist = 0.01 --movement distances smaller than this are considered 0s
-local min_move_angle = 5 --(in degrees)
+local min_move_angle = 1 --(in degrees)
 --Screen constants
 local scr_w=640 --the width of the screen, in pixels
 local window=390 --the number of pixels from the middle of the frame to be taken
 local margin=(scr_w-window)/2
-
+local box=20
+local half_box=box/2
 
 --NOTE: maybe move all these constants to a separate data file
 -- Constant declaration
@@ -67,7 +73,7 @@ local slope = {slope1_2, slope2_3, slope3_4, slope4_5, slope5_6, slope6_7, slope
 
 local numThresh = table.getn(thres)
 
-function turn_bot(_angle)
+function bot.turn_bot(_angle)
 	if math.abs(_angle) > min_move_angle then
 	
 		_angle = _angle*-1
@@ -79,35 +85,7 @@ function turn_bot(_angle)
 	end	
 end
 
-function move_straight()
-	--edges the robot forward
-	--returns distance traveled
-	local b=kinect.getDepth()
-   c=b:narrow(3,margin,window) --extracts a strip from the middle of the depth image
-   local min = torch.min(c)
-   local distance = get_distance(min)
-   --print("Distance estimated:",distance)
-
-
-	if (distance >= (min_obj_dist+min_move_dist)) then --too far
-		local dist_to_move = distance - min_obj_dist
-		--executes movement command
-		local full_path = path..dist_to_move.." 0"
-      os.execute(command_path..full_path)
-
-	elseif (distance < max_obj_dist-min_move_dist) then --too close
-		local dist_to_move = distance - max_obj_dist
-		--executes movement command
-		local full_path = path..dist_to_move.." 0"
-		print("Distance to move", dist_to_move)
-      os.execute(command_path..full_path)
-	end
-	
-		
-end
-
-
-function get_distance(kinect_value)
+function bot.get_distance(kinect_value)
 	local count = 0;
 	if kinect_value < thres[1] then
 		return 0.5
@@ -124,3 +102,33 @@ function get_distance(kinect_value)
    local est_dist = dist[count] + slope[count]*(kinect_value-thres[count])
 	return est_dist
 end
+
+function bot.full_move(angle)
+	if math.abs(angle) > min_move_angle then
+		angle = angle*-1
+	else
+		angle = 0
+	end
+	local cx = state.results[1].cx
+	local cy = state.results[1].cy
+	local intermediate_depth = source.depthFrame:narrow(3,cx-half_box,box)
+	local depth = intermediate_depth:narrow(2,cy-half_box,box)
+	local min=torch.min(depth)
+	local distance=bot.get_distance(min)
+	local dist_to_move = 0
+	if (distance >= (min_obj_dist+min_move_dist)) then --too far
+		dist_to_move = distance - min_obj_dist
+
+	elseif (distance < max_obj_dist-min_move_dist) then --too close
+		dist_to_move = distance - max_obj_dist
+	end
+
+	--executes movement command
+	local full_path = path_smooth..dist_to_move.." "..angle.."&"
+	print(full_path)
+	os.execute("killall smooth_mover;"..command_path..full_path)
+	end
+
+
+
+return bot

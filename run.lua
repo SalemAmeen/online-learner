@@ -40,7 +40,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 -- parse args
 op = xlua.OptionParser('%prog [options]')
 op:option{'-s', '--source', action='store', dest='source',
-          help='image source, can be one of: camera | video | dataset',
+          help='image source, can be one of: camera | video | dataset | kinect',
           default='camera'}
 
 op:option{'-c', '--camera', action='store', dest='camidx',
@@ -122,9 +122,9 @@ op:option{'-R', '--ratiocalib', action='store', dest='rcalib',
 op:option{'-z', '--zscreen', action='store', dest='zscreen',
           help='z_screen value output by the calibration, to be used to estimate angles',
           default=0}
-op:option{'-F', '--findfollow', action='store_true', dest='findfollow',
+op:option{'-F', '--findfollow', action='store', dest='findfollow',
           help='turn and move towards tracked object',
-          default=false}
+          default='none'}
 
 options,args = op:parse()
 
@@ -154,7 +154,7 @@ profiler = xlua.Profiler()
 if options.rcalib ~=0 or options.zscreen ~=0 then
 	calib = require 'calib'
 	bot = require 'bot'
-elseif options.findfollow then
+elseif options.findfollow~='none' then
 	findf = require 'findf'
 	bot = require 'bot'
 end
@@ -165,6 +165,7 @@ state = require 'state'
 source = require 'source'
 process = require 'process'
 tracker = require 'tracker'
+velocity = require 'velocity'
 -- load gui and display routine, if necessary
 if not options.nogui then
    -- setup GUI (external UI file)

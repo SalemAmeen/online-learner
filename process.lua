@@ -47,8 +47,7 @@ print('')
 
 
 --A.W
---NOTE: decideMsg is in 'calib.lua'
-if calib then decideMsg(options) end
+if calib then calib.decideMsg(options) end
 
 
 -- create other encoders for online learning and full scene encoding
@@ -221,13 +220,11 @@ local function process()
    ------------------------------------------------------------
    if state.learn then
 		--A.W.
-		--NOTE: isDeciding, decideDist are in 'calib.lua'
 		if calib then
 			--either calibrates a z_screen or
 			--predicts and angle based on a calibrated z value
-			decideDist(options, state.learn.x, state.learn.y, raw_w)
+			calib.decideDist(options, state.learn.x, state.learn.y, raw_w)
 		else
-			print("ADDING STUFF")
 			profiler:start('learn-new-view')
       	-- compute x,y coordinates
      		local lx = math.min(math.max(state.learn.x-boxw/2,0),state.yuvFrame:size(3)-boxw)
@@ -260,25 +257,32 @@ local function process()
 			learnedFlag = true
      		profiler:lap('learn-new-view')
 		end
- 		
+ 	
       
    end
 	------------------------------------------------------------
 	-- (?) findfollow object
    ------------------------------------------------------------
 	--A.W & Y.L.
-	if options.findfollow and learnedFlag then
+	if options.findfollow~='none' and learnedFlag then
 		local ang = 0
-		--NOTE: findMedian is in 'findf.lua'
       if state.results[1] then
-			ang = findMedian(options, state.results[1].cx , state.results[1].cy, raw_w)
+			ang = findf.findMedian(options, state.results[1].cx , state.results[1].cy, raw_w)
       else
-			ang = findMedian(options, -1, -1, raw_w)
+			ang = findf.findMedian(options, -1, -1, raw_w)
       end
 
 		if ang then
-			turn_bot(ang)
-			move_straight()
+			print('turning', ang)
+			bot.full_move(ang)
+			--[[bot.turn_bot(ang)
+			if options.findfollow=='s' then --stationary object assumption
+				bot.move_all_the_way()			
+			elseif options.findfollow=='m' then--moving object
+				print('then move')
+				bot.move_straight()			
+			end--]]
+			
 		end
 		
 

@@ -37,8 +37,8 @@ state.finish = function()
                      state.dsoutfile:close()
                   end
                end
-
-
+-- time it takes to process the frame
+state.frame_time = {}
 -- options
 state.classes = options.classes
 state.threshold = options.recognition_lthreshold
@@ -64,7 +64,8 @@ else
       profiler:start('full-loop','fps')
       process()
       display.update()
-      profiler:lap('full-loop')
+      state.frame_time = profiler:lap('full-loop')
+		velocity.compute_velocity()
       display.results()
    end
    function state.begin()
