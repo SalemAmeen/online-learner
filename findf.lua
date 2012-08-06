@@ -1,6 +1,91 @@
-local z_screen_DEBUG = 500; --kinect:500--usb:640;
+require 'inline'
 
 local findf = {}
+
+inline.preamble [[
+	#include<sys/stat.h>
+	#include<sys/mman.h>
+	#include<fcntl.h>
+	#include<unistd.h>
+	#include<stdbool.h>
+
+	typedef struct image_data{
+		unsigned char data[640*480*3];
+	}image_data;
+
+	typedef struct depth_data{
+		float data[640*480];
+	}depth_data;
+]]
+
+findf.set_flag = inline.load [[
+	bool* shared_ptr;
+	int fd = shm_open("/OL_flag", (O_RDWR), (S_IRUSR|S_IWUSR));
+	shared_ptr = (bool*)mmap(0, sizeof(bool), (PROT_READ|PROT_WRITE), MAP_SHARED, fd, 0);
+	lockf(fd, F_LOCK, sizeof(bool));
+	*shared_ptr = true;
+	lockf(fd, F_ULOCK, sizeof(bool));
+	shm_unlink("/OL_flag");
+]]
+
+findf.unset_flag = inline.load [[
+	bool* shared_ptr;
+	int fd = shm_open("/OL_flag", (O_RDWR), (S_IRUSR|S_IWUSR));
+	shared_ptr = (bool*)mmap(0, sizeof(bool), (PROT_READ|PROT_WRITE), MAP_SHARED, fd, 0);
+	lockf(fd, F_LOCK, sizeof(bool));
+	*shared_ptr = false;
+	lockf(fd, F_ULOCK, sizeof(bool));
+	shm_unlink("/OL_flag");
+]]
+
+findf.getRosImage = inline.load [[
+	image_data* mapped_ptr;
+	int fd = shm_open("/rgb_image_share", (O_RDWR), (S_IRUSR|S_IWUSR));
+	
+	THFloatTensor* float_tensor = luaT_checkudata(L,1,luaT_checktypename2id(L,"torch.FloatTensor"));
+	float *c_tensor = THFloatTensor_data(float_tensor);
+	
+	int width_inc = float_tensor->stride[2];
+	int height_inc = float_tensor->stride[1];
+	int dim_inc = float_tensor->stride[0];
+	lockf(fd,F_LOCK,sizeof(image_data));
+	mapped_ptr = (image_data*)mmap(0, sizeof(image_data), (PROT_READ|PROT_WRITE), MAP_SHARED, fd, 0);
+	int i,j,num;
+	for(i=0; i<480; i++){
+		for(j=0; j<640; j++){
+			num = i*height_inc+j*width_inc;
+			c_tensor[num] = ((unsigned int)(mapped_ptr->data[i*(3*640)+j*3]))/255.0;
+			c_tensor[dim_inc + num] = ((unsigned int)(mapped_ptr->data[i*(3*640)+j*3+1]))/255.0;
+			c_tensor[dim_inc*2 + num] = ((unsigned int)(mapped_ptr->data[i*(3*640)+j*3+2]))/255.0;
+		}
+	}
+	lockf(fd,F_ULOCK,sizeof(image_data));
+]]
+
+findf.getRosDepthImage = inline.load [[
+	depth_data* mapped_ptr;
+	int fd = shm_open("/depth_image_share", (O_RDWR), (S_IRUSR|S_IWUSR));
+	
+	THFloatTensor* float_tensor = luaT_checkudata(L,1,luaT_checktypename2id(L,"torch.FloatTensor"));
+	float *c_tensor = THFloatTensor_data(float_tensor);
+	
+	int width_inc = float_tensor->stride[1];
+	int height_inc = float_tensor->stride[0];
+	lockf(fd,F_LOCK,sizeof(depth_data));
+	mapped_ptr = (depth_data*)mmap(0, sizeof(depth_data), (PROT_READ|PROT_WRITE), MAP_SHARED, fd, 0);
+	int i,j,num;
+	for(i=0; i<480; i++){
+		for(j=0; j<640; j++){
+			num = i*height_inc+j*width_inc;
+			c_tensor[num] = mapped_ptr->data[i*640+j];
+		}
+	}
+	lockf(fd,F_ULOCK,sizeof(depth_data));
+]]
+
+
+
+local z_screen_DEBUG = 500; --kinect:500--usb:640;
 
 local nil_count = 0; -- counts the number of times no result is generated
 local turn_count = 0; -- tracks which movement the robot needs to make
@@ -31,7 +116,15 @@ function findf.findMedian(_options, _x, _y, _screenW)
 		nil_count = nil_count + 1;
       if nil_count >= no_object_frames then
       	num_frames = 0; --resets the median count
+			print('lost object');
+			bot.smooth_stop();
+			--print('smooooooth stop');
+
+			--turn this back on later maybe?			
 			findf.look_around()
+			
+			--Turns off OL flag in shared memory
+			--unset_flag();			
 		end
 
 	else --if there is a result
@@ -80,7 +173,7 @@ function findf.look_around()
 	local n = 360/turn_angle_incr
 	if turn_count % turn_lag == 0 then
 		bot.turn_bot(left_right*turn_angle_incr) -- if it's left, then the argument is negative, if it's right, then the argument is positive
-		findf.playBeep(1)
+		--findf.playBeep(1)
 	end
 	turn_count = turn_count + 1;
 	if(turn_count == n*turn_lag) then

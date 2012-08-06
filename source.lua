@@ -88,6 +88,9 @@ function source:getframe()
 		local RGBD_frame = kinect.getRGBD()
 		state.rawFrame = RGBD_frame:narrow(1,1,3)
 		source.depthFrame = RGBD_frame:narrow(1,4,1)
+	elseif options.source == 'ros' then
+		state.rawFrame = torch.FloatTensor(3,480,640)
+		findf.getRosImage(state.rawFrame)
 	else
 		state.rawFrame = self:forward()
 	end

@@ -7,7 +7,7 @@ local c = require 'coroutines'
 local downs = options.downs
 local boxh = options.boxh
 local boxw = options.boxw
-
+local seenOnce = false
 -- encoder
 print('e-Lab Online Learner')
 print('loading encoder:')
@@ -264,16 +264,32 @@ local function process()
 	-- (?) findfollow object
    ------------------------------------------------------------
 	--A.W & Y.L.
-	if options.findfollow~='none' and learnedFlag then
+	if options.findfollow~='none' and (learnedFlag or ui.hasLoaded) then
 		local ang = 0
       if state.results[1] then
+			if seenOnce==false then
+			  --os.execute("killall basic_mover")
+				print("\n\n\n")
+				print("----------------------------------")	
+				print("From online learner: setting flag")
+				print("----------------------------------")
+				print("\n\n\n")
+
+				--turns on OL flag in shared memory
+				findf.set_flag();
+				--kinect.initDevice();
+				seenOnce = true;
+			end
+			
 			ang = findf.findMedian(options, state.results[1].cx , state.results[1].cy, raw_w)
-      else
+      elseif seenOnce then
 			ang = findf.findMedian(options, -1, -1, raw_w)
+			--only add to the "losing object" count f you've seen the object once first
+		else 
+			ang = nil;
       end
 
 		if ang then
-			print('turning', ang)
 			bot.full_move(ang)
 			--[[bot.turn_bot(ang)
 			if options.findfollow=='s' then --stationary object assumption
@@ -282,7 +298,6 @@ local function process()
 				print('then move')
 				bot.move_straight()			
 			end--]]
-			
 		end
 		
 

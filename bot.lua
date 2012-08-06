@@ -12,14 +12,14 @@ os.execute("sleep 3")
 if options.source ~= 'kinect' then
 	require 'kinect'
 	-- Initialize the Kinect
-	kinect.initDevice()
+	--kinect.initDevice()
 end
 
 --Movement constants
-local min_obj_dist = .7 --(in meters) the minimum distance 
+local min_obj_dist = .5 --(in meters) the minimum distance 
 							 --the kinect will allow between the camera and the object
 
-local max_obj_dist = .6 -- (in meters)
+local max_obj_dist = .1 -- (in meters)
 
 
 local min_move_dist = 0.01 --movement distances smaller than this are considered 0s
@@ -111,10 +111,27 @@ function bot.full_move(angle)
 	end
 	local cx = state.results[1].cx
 	local cy = state.results[1].cy
-	local intermediate_depth = source.depthFrame:narrow(3,cx-half_box,box)
-	local depth = intermediate_depth:narrow(2,cy-half_box,box)
-	local min=torch.min(depth)
-	local distance=bot.get_distance(min)
+	print("Online-learner getting depth data")
+	local depthFrame = torch.FloatTensor(480,640);
+	findf.getRosDepthImage(depthFrame);
+	if cx-half_box < 0 then
+		cx = half_box
+	end
+	if cy-half_box < 0 then
+		cy = half_box
+	end
+	if cx+half_box > 640 then
+		cx = 640-half_box
+	end
+	if cy+half_box > 480 then
+		cy = 480-half_box
+	end
+   local intermediate_depth = depthFrame:narrow(2,cx-half_box,box)
+	local depth = intermediate_depth:narrow(1,cy-half_box,box)
+	--local intermediate_depth = source.depthFrame:narrow(3,cx-half_box,box)
+	--local depth = depthFrame:narrow(3,margin,window)
+	local distance=torch.min(depth)
+	--local distance=bot.get_distance(min)
 	local dist_to_move = 0
 	if (distance >= (min_obj_dist+min_move_dist)) then --too far
 		dist_to_move = distance - min_obj_dist
@@ -127,8 +144,12 @@ function bot.full_move(angle)
 	local full_path = path_smooth..dist_to_move.." "..angle.."&"
 	print(full_path)
 	os.execute("killall smooth_mover;"..command_path..full_path)
-	end
+end
 
-
+function bot.smooth_stop()
+	local full_path = path_smooth.."0.1".."&"
+	--print(full_path)
+	os.execute("killall smooth_mover;"..command_path..full_path)
+end
 
 return bot

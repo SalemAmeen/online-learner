@@ -115,6 +115,8 @@ function ui.proc()
       local loaded = file:readObject()
       state.memory = loaded
       file:close()
+		--A.W.
+		ui.hasLoaded = true
       ui.load = false
    end
 end

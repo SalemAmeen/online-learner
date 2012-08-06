@@ -29,7 +29,7 @@
 
 require 'xlua'
 require 'nnx'
-require 'openmp'
+--require 'openmp'
 
 -- do everything in single precision
 torch.setdefaulttensortype('torch.FloatTensor')
@@ -40,7 +40,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 -- parse args
 op = xlua.OptionParser('%prog [options]')
 op:option{'-s', '--source', action='store', dest='source',
-          help='image source, can be one of: camera | video | dataset | kinect',
+          help='image source, can be one of: camera | video | dataset | kinect | ros',
           default='camera'}
 
 op:option{'-c', '--camera', action='store', dest='camidx',
@@ -177,6 +177,7 @@ if not options.nogui then
 
    display = require 'display'
    ui = require 'ui'
+	ui.load = true -- makes the online-learner loads memory at startup
 end
 
 -- end definition of global variables
