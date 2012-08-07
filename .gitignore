@@ -2,7 +2,6 @@
 *.pyc
 *.sw?
 
-/scratch
 /.smt
 /TLD
 /results
