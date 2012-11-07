@@ -29,7 +29,6 @@
 
 require 'xlua'
 require 'nnx'
-require 'openmp'
 
 -- do everything in single precision
 torch.setdefaulttensortype('torch.FloatTensor')
