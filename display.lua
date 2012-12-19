@@ -149,6 +149,9 @@ function display.update()
       end
 
       -- update threshold
+      if initial == nil then
+         widget.verticalSlider.value = state.threshold * 1000
+      end
       state.threshold = widget.verticalSlider.value / 1000
       widget.lcdNumber.value = state.threshold
       widget.progressBar.value = state.maxProb * 1000
